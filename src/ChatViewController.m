@@ -18,6 +18,7 @@
 @property (nonatomic, assign) CGFloat keyboardHeight;
 @property (nonatomic, assign) BOOL isSending;
 @property (nonatomic, assign) BOOL isWebSearchActive;
+@property (nonatomic, strong) UIAlertController *deviceAuthAlert;
 
 @end
 
@@ -42,7 +43,6 @@
     [self setupInputBar];
     [self registerKeyboardNotifications];
 
-    // iOS Ayarlar uygulamasındaki değişiklikleri canlı dinle
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(userDefaultsDidChange:)
                                                  name:NSUserDefaultsDidChangeNotification
@@ -64,7 +64,13 @@
 
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.9)", model ?: @"gemini-1.5-flash"];
+    NSString *authStatus = @"";
+    if ([GeminiClient sharedClient].isGoogleAccountLinked) {
+        authStatus = @" [Google Hesabı]";
+    } else if ([GeminiClient sharedClient].apiKey.length > 5) {
+        authStatus = @" [API Key]";
+    }
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.0)", model ?: @"gemini-1.5-flash", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -73,10 +79,146 @@
                                                                             target:self
                                                                             action:@selector(clearChatTapped)];
 
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Ayarlar"
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"İşlemler / Ayarlar"
                                                                               style:UIBarButtonItemStylePlain
                                                                              target:self
                                                                              action:@selector(openSettingsTapped)];
+}
+
+- (void)openSettingsTapped {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Gemini İşlemleri"
+                                                                   message:@"Google Hesabı bağlantısı veya model listesini yenileme:"
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+
+    // 1. BUTON: Google Hesabı Bağla veya Çıkış Yap
+    if ([GeminiClient sharedClient].isGoogleAccountLinked) {
+        NSString *email = [GeminiClient sharedClient].userEmail.length > 0 ? [GeminiClient sharedClient].userEmail : @"Bağlı Hesap";
+        [sheet addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"🔴 Google Hesabından Çıkış Yap (%@)", email]
+                                                  style:UIAlertActionStyleDestructive
+                                                handler:^(UIAlertAction *action) {
+            [[GeminiClient sharedClient] signOutGoogleAccount];
+            [self updateTitleWithModel];
+            [self showAlertWithTitle:@"Çıkış Yapıldı" message:@"Google hesabınızın bağlantısı kaldırıldı."];
+        }]];
+    } else {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"🔑 Google Hesabı Bağla (google.com/device)"
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction *action) {
+            [self startGoogleOAuthFlow];
+        }]];
+    }
+
+    // 2. BUTON: Modelleri Yenile (Refresh Models)
+    [sheet addAction:[UIAlertAction actionWithTitle:@"🔄 Modelleri Canlı Yenile (Refresh Models)"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+        [self refreshModelsAction];
+    }]];
+
+    // 3. BUTON: iPad Ayarları Bilgisi
+    [sheet addAction:[UIAlertAction actionWithTitle:@"⚙️ iPad Ayarları Bilgisi"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+        [self showAlertWithTitle:@"Ayarlar Konumu" 
+                         message:@"API anahtarınızı, Client ID/Secret veya model adınızı değiştirmek için iPad'inizin ana ekranındaki 'Ayarlar' (Settings) uygulamasını açıp 'Gemini' sayfasına gidin."];
+    }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
+
+    // iPad ActionSheet Anchor
+    sheet.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItem;
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)startGoogleOAuthFlow {
+    if (![[GeminiClient sharedClient] hasOAuthCredentials]) {
+        [self showAlertWithTitle:@"Client ID Gerekli" 
+                         message:@"Lütfen önce iPad'inizin ana ekranındaki 'Ayarlar' > 'Gemini' sayfasına gidip Google Cloud Console'dan aldığınız OAuth Client ID ve Secret'ı yapıştırın."];
+        return;
+    }
+
+    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"Google Bağlantısı"
+                                                                     message:@"Cihaz kodu alınıyor, lütfen bekleyin..."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:loading animated:YES completion:nil];
+
+    [[GeminiClient sharedClient] startDeviceAuthFlowWithCompletion:^(NSString *userCode, NSString *verificationUrl, NSString *deviceCode, NSError *error) {
+        [loading dismissViewControllerAnimated:YES completion:^{
+            if (error) {
+                [self showAlertWithTitle:@"Bağlantı Hatası" message:error.localizedDescription];
+                return;
+            }
+
+            NSString *msg = [NSString stringWithFormat:@"Telefonunuzdan veya bilgisayarınızdan şu adresi açın:\n\n%@\n\nVe bu kodu girin:\n👉 %@ 👈\n\nOnayladıktan sonra bu ekran otomatik kapanacaktır.",
+                             verificationUrl, userCode];
+
+            self.deviceAuthAlert = [UIAlertController alertControllerWithTitle:@"Google Hesabınızı Onaylayın"
+                                                                       message:msg
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+            [self.deviceAuthAlert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
+            [self presentViewController:self.deviceAuthAlert animated:YES completion:nil];
+
+            [[GeminiClient sharedClient] pollDeviceTokenWithDeviceCode:deviceCode interval:5 completion:^(BOOL success, NSError *pollErr) {
+                [self.deviceAuthAlert dismissViewControllerAnimated:YES completion:^{
+                    if (success) {
+                        [self updateTitleWithModel];
+                        [self showAlertWithTitle:@"Giriş Başarılı!" 
+                                         message:@"Google hesabınız başarıyla bağlandı. Artık kotasız ve doğrudan hesabınızla konuşabilirsiniz."];
+                    } else if (pollErr) {
+                        [self showAlertWithTitle:@"Giriş Tamamlanamadı" message:pollErr.localizedDescription];
+                    }
+                }];
+            }];
+        }];
+    }];
+}
+
+- (void)refreshModelsAction {
+    if (![[GeminiClient sharedClient] isAuthenticated]) {
+        [self showAlertWithTitle:@"Giriş Gerekli" 
+                         message:@"Modelleri çekebilmek için lütfen geçerli bir API Key girin veya Google Hesabınızı bağlayın."];
+        return;
+    }
+
+    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"Modeller Alınıyor"
+                                                                     message:@"Google API'den canlı model listesi çekiliyor..."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:loading animated:YES completion:nil];
+
+    [[GeminiClient sharedClient] fetchAvailableModelsWithCompletion:^(NSArray *models, NSError *error) {
+        [loading dismissViewControllerAnimated:YES completion:^{
+            if (error) {
+                [self showAlertWithTitle:@"Hata" message:error.localizedDescription];
+                return;
+            }
+
+            if (models.count == 0) {
+                [self showAlertWithTitle:@"Model Bulunamadı" message:@"Erişilebilir model listesi boş döndü."];
+                return;
+            }
+
+            // Gelen modelleri seçtiren şık bir ActionSheet aç
+            UIAlertController *modelPicker = [UIAlertController alertControllerWithTitle:@"Model Seçin"
+                                                                                 message:@"Kullanmak istediğiniz modeli seçin:"
+                                                                          preferredStyle:UIAlertControllerStyleActionSheet];
+            for (NSString *m in models) {
+                [modelPicker addAction:[UIAlertAction actionWithTitle:m style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                    [[NSUserDefaults standardUserDefaults] setObject:m forKey:@"GeminiClientModel"];
+                    [[NSUserDefaults standardUserDefaults] synchronize];
+                    [self updateTitleWithModel];
+                }]];
+            }
+            [modelPicker addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
+            modelPicker.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItem;
+            [self presentViewController:modelPicker animated:YES completion:nil];
+        }];
+    }];
+}
+
+- (void)showAlertWithTitle:(NSString *)title message:(NSString *)msg {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)setupTableView {
@@ -111,7 +253,6 @@
     topLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_inputContainerView addSubview:topLine];
 
-    // İnternet / Web Arama Butonu
     _webSearchButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _webSearchButton.frame = CGRectMake(8, 7, 36, 36);
     _webSearchButton.layer.cornerRadius = 18.0;
@@ -122,7 +263,6 @@
     [self updateWebSearchButtonAppearance];
     [_inputContainerView addSubview:_webSearchButton];
 
-    // Chatbox
     CGFloat textX = 50.0;
     CGFloat textW = w - textX - 68.0;
     _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(textX, 8, textW, 34)];
@@ -139,7 +279,6 @@
     _inputTextField.returnKeyType = UIReturnKeySend;
     [_inputContainerView addSubview:_inputTextField];
 
-    // Gönder butonu
     _sendButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _sendButton.frame = CGRectMake(w - 62, 8, 54, 34);
     _sendButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -148,7 +287,6 @@
     [_sendButton addTarget:self action:@selector(sendButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     [_inputContainerView addSubview:_sendButton];
 
-    // Aktivite göstergesi
     _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     _activityIndicator.center = _sendButton.center;
     _activityIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -187,19 +325,11 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.9) üzerinde çalışıyorum.\n\nAPI anahtarınızı veya model ayarlarınızı değiştirmek için iPad'inizin 'Ayarlar' (Settings.app) uygulamasını açıp 'Gemini' sayfasına gidebilirsiniz.";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.0) üzerinde çalışıyorum.\n\nSağ üstteki 'İşlemler / Ayarlar' butonundan tek dokunuşla Google Hesabınızı bağlayabilir veya modelleri canlı listeleyebilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
     }
-}
-
-- (void)openSettingsTapped {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Uygulama Ayarları"
-                                                                   message:@"API anahtarınızı, model seçimini veya gelişmiş ayarları düzenlemek için iPad'inizin ana ekranındaki 'Ayarlar' (Settings) uygulamasını açıp sol menüden 'Gemini' sekmesine dokunun."
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)clearChatTapped {
@@ -215,14 +345,8 @@
 #pragma mark - Keyboard Notifications
 
 - (void)registerKeyboardNotifications {
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillShow:)
-                                                 name:UIKeyboardWillShowNotification
-                                               object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillHide:)
-                                                 name:UIKeyboardWillHideNotification
-                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
 }
 
 - (void)keyboardWillShow:(NSNotification *)note {
@@ -271,7 +395,7 @@
     if (rawText.length == 0 || self.isSending) return;
 
     if (![[GeminiClient sharedClient] isAuthenticated]) {
-        [self showApiKeyPrompt];
+        [self showAuthPrompt];
         return;
     }
 
@@ -325,9 +449,9 @@
     }
 }
 
-- (void)showApiKeyPrompt {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Anahtarı Gerekli"
-                                                                   message:@"Gemini ile konuşabilmek için iPad'inizin ana ekranındaki 'Ayarlar' (Settings) uygulamasını açıp 'Gemini' sayfasından API anahtarınızı girmeniz gerekmektedir."
+- (void)showAuthPrompt {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Giriş Gerekli"
+                                                                   message:@"Gemini ile konuşabilmek için sağ üstteki 'İşlemler' menüsünden Google Hesabınızı bağlayabilir veya iPad Ayarları'ndan API anahtarınızı girebilirsiniz."
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];

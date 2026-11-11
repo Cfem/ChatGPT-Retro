@@ -3,10 +3,12 @@
 
 static NSString *const kGeminiApiKeyDefaultsKey = @"GeminiClientApiKey";
 static NSString *const kGeminiModelDefaultsKey = @"GeminiClientModel";
+static NSString *const kGeminiCachedModelsKey = @"GeminiClientCachedModels";
 static NSString *const kGeminiOAuthClientIdKey = @"google_oauth_client_id";
 static NSString *const kGeminiOAuthClientSecretKey = @"google_oauth_client_secret";
 static NSString *const kGeminiOAuthAccessTokenKey = @"GeminiOAuthAccessToken";
 static NSString *const kGeminiOAuthRefreshTokenKey = @"GeminiOAuthRefreshToken";
+static NSString *const kGeminiOAuthEmailKey = @"GeminiOAuthEmail";
 static NSString *const kCustomPayloadTemplateKey = @"custom_request_payload";
 static NSString *const kCustomEndpointKey = @"custom_api_endpoint";
 static NSString *const kGoogleSearchEnabledKey = @"enable_google_search";
@@ -14,6 +16,8 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
 @interface GeminiClient ()
 @property (nonatomic, strong) NSURLSession *session;
+@property (nonatomic, strong) NSTimer *pollTimer;
+@property (nonatomic, copy) GeminiTokenPollHandler activePollHandler;
 @end
 
 @implementation GeminiClient
@@ -47,14 +51,233 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     return (m && m.length > 0) ? m : kDefaultModel;
 }
 
+- (NSString *)oauthClientId {
+    return [[[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientIdKey] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+}
+
+- (NSString *)oauthClientSecret {
+    return [[[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientSecretKey] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+}
+
 - (NSString *)oauthAccessToken {
     return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthAccessTokenKey] ?: @"";
 }
 
+- (NSString *)userEmail {
+    return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthEmailKey] ?: @"";
+}
+
+- (BOOL)hasOAuthCredentials {
+    return (self.oauthClientId.length > 5 && self.oauthClientSecret.length > 3);
+}
+
+- (BOOL)isGoogleAccountLinked {
+    return (self.oauthAccessToken.length > 10);
+}
+
 - (BOOL)isAuthenticated {
+    if (self.isGoogleAccountLinked) return YES;
     if (self.apiKey.length > 5) return YES;
-    if (self.oauthAccessToken.length > 10) return YES;
     return NO;
+}
+
+- (void)signOutGoogleAccount {
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthAccessTokenKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthRefreshTokenKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthEmailKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+#pragma mark - OAuth Device Flow
+
+- (void)startDeviceAuthFlowWithCompletion:(GeminiDeviceAuthHandler)completion {
+    if (![self hasOAuthCredentials]) {
+        if (completion) {
+            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: @"Lütfen iPad Ayarlar > Gemini menüsünden oluşturduğunuz Client ID ve Client Secret'ı girin."}];
+            completion(nil, nil, nil, err);
+        }
+        return;
+    }
+
+    NSURL *url = [NSURL URLWithString:@"https://oauth2.googleapis.com/device/code"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+
+    NSString *scope = @"https://www.googleapis.com/auth/generative-language email profile";
+    NSString *bodyStr = [NSString stringWithFormat:@"client_id=%@&scope=%@", 
+                         self.oauthClientId, [scope stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+    [request setHTTPBody:[bodyStr dataUsingEncoding:NSUTF8StringEncoding]];
+
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, nil, nil, error);
+            });
+            return;
+        }
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSString *userCode = json[@"user_code"];
+        NSString *verificationUrl = json[@"verification_url"] ?: @"https://www.google.com/device";
+        NSString *deviceCode = json[@"device_code"];
+
+        if (!userCode || !deviceCode) {
+            NSString *errMsg = json[@"error_description"] ?: @"Google Device Flow başlatılamadı.";
+            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: errMsg}];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, nil, nil, err);
+            });
+            return;
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(userCode, verificationUrl, deviceCode, nil);
+        });
+    }];
+    [task resume];
+}
+
+- (void)pollDeviceTokenWithDeviceCode:(NSString *)deviceCode 
+                             interval:(NSInteger)interval 
+                           completion:(GeminiTokenPollHandler)completion {
+    [self.pollTimer invalidate];
+    self.activePollHandler = completion;
+
+    NSInteger pollSec = (interval > 3) ? interval : 5;
+    self.pollTimer = [NSTimer scheduledTimerWithTimeInterval:pollSec
+                                                      target:self
+                                                    selector:@selector(checkTokenStatus:)
+                                                    userInfo:deviceCode
+                                                     repeats:YES];
+}
+
+- (void)checkTokenStatus:(NSTimer *)timer {
+    NSString *deviceCode = timer.userInfo;
+    NSURL *url = [NSURL URLWithString:@"https://oauth2.googleapis.com/token"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+
+    NSString *bodyStr = [NSString stringWithFormat:@"client_id=%@&client_secret=%@&device_code=%@&grant_type=urn:ietf:params:oauth:grant-type:device_code",
+                         self.oauthClientId, self.oauthClientSecret, deviceCode];
+    [request setHTTPBody:[bodyStr dataUsingEncoding:NSUTF8StringEncoding]];
+
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (!data) return;
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSString *accessToken = json[@"access_token"];
+        NSString *refreshToken = json[@"refresh_token"];
+
+        if (accessToken && accessToken.length > 0) {
+            [timer invalidate];
+            [[NSUserDefaults standardUserDefaults] setObject:accessToken forKey:kGeminiOAuthAccessTokenKey];
+            if (refreshToken) [[NSUserDefaults standardUserDefaults] setObject:refreshToken forKey:kGeminiOAuthRefreshTokenKey];
+            [[NSUserDefaults standardUserDefaults] synchronize];
+
+            [self fetchUserEmail:accessToken];
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.activePollHandler) {
+                    self.activePollHandler(YES, nil);
+                    self.activePollHandler = nil;
+                }
+            });
+            return;
+        }
+
+        NSString *err = json[@"error"];
+        if ([err isEqualToString:@"authorization_pending"] || [err isEqualToString:@"slow_down"]) {
+            return;
+        } else {
+            [timer invalidate];
+            NSString *desc = json[@"error_description"] ?: @"Giriş tamamlanamadı.";
+            NSError *failErr = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: desc}];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.activePollHandler) {
+                    self.activePollHandler(NO, failErr);
+                    self.activePollHandler = nil;
+                }
+            });
+        }
+    }];
+    [task resume];
+}
+
+- (void)fetchUserEmail:(NSString *)token {
+    NSURL *url = [NSURL URLWithString:@"https://www.googleapis.com/oauth2/v2/userinfo"];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    [req setValue:[NSString stringWithFormat:@"Bearer %@", token] forHTTPHeaderField:@"Authorization"];
+
+    [[self.session dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *res, NSError *err) {
+        if (data) {
+            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            if (json[@"email"]) {
+                [[NSUserDefaults standardUserDefaults] setObject:json[@"email"] forKey:kGeminiOAuthEmailKey];
+                [[NSUserDefaults standardUserDefaults] synchronize];
+            }
+        }
+    }] resume];
+}
+
+- (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion {
+    if (![self isAuthenticated]) {
+        if (completion) {
+            NSError *err = [NSError errorWithDomain:@"GeminiClient" code:401 userInfo:@{NSLocalizedDescriptionKey: @"Lütfen önce API Key girin veya Google hesabınızı bağlayın."}];
+            completion(nil, err);
+        }
+        return;
+    }
+
+    NSString *urlString;
+    if (self.isGoogleAccountLinked) {
+        urlString = @"https://generativelanguage.googleapis.com/v1beta/models";
+    } else {
+        urlString = [NSString stringWithFormat:@"https://generativelanguage.googleapis.com/v1beta/models?key=%@", self.apiKey];
+    }
+
+    NSURL *url = [NSURL URLWithString:urlString];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"GET"];
+
+    if (self.isGoogleAccountLinked) {
+        [request setValue:[NSString stringWithFormat:@"Bearer %@", self.oauthAccessToken] forHTTPHeaderField:@"Authorization"];
+    }
+
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, error);
+            });
+            return;
+        }
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSArray *rawModels = json[@"models"];
+        NSMutableArray *supported = [NSMutableArray array];
+
+        for (NSDictionary *m in rawModels) {
+            NSArray *methods = m[@"supportedGenerationMethods"];
+            if ([methods containsObject:@"generateContent"]) {
+                NSString *name = m[@"name"];
+                if ([name hasPrefix:@"models/"]) {
+                    name = [name substringFromIndex:7];
+                }
+                if (name.length > 0) {
+                    [supported addObject:name];
+                }
+            }
+        }
+
+        [[NSUserDefaults standardUserDefaults] setObject:supported forKey:kGeminiCachedModelsKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(supported, nil);
+        });
+    }];
+    [task resume];
 }
 
 - (NSString *)customRequestPayloadTemplate {
@@ -68,7 +291,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" 
                                                code:401 
-                                           userInfo:@{NSLocalizedDescriptionKey: @"Lütfen iPad'inizin Ayarlar uygulamasını açıp 'Gemini' sayfasından API anahtarınızı girin."}];
+                                           userInfo:@{NSLocalizedDescriptionKey: @"Lütfen Ayarlar'dan API Key girin veya Google Hesabınızı bağlayın."}];
             completion(nil, err);
         }
         return;
@@ -83,10 +306,10 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     NSString *baseUrl = (customBaseUrl && customBaseUrl.length > 5) ? customBaseUrl : @"https://generativelanguage.googleapis.com/v1beta";
 
     NSString *urlString;
-    if (self.apiKey.length > 5) {
-        urlString = [NSString stringWithFormat:@"%@/models/%@:generateContent?key=%@", baseUrl, model, self.apiKey];
-    } else {
+    if (self.isGoogleAccountLinked) {
         urlString = [NSString stringWithFormat:@"%@/models/%@:generateContent", baseUrl, model];
+    } else {
+        urlString = [NSString stringWithFormat:@"%@/models/%@:generateContent?key=%@", baseUrl, model, self.apiKey];
     }
 
     NSURL *url = [NSURL URLWithString:urlString];
@@ -94,7 +317,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
 
-    if (self.apiKey.length <= 5 && self.oauthAccessToken.length > 0) {
+    if (self.isGoogleAccountLinked) {
         [request setValue:[NSString stringWithFormat:@"Bearer %@", self.oauthAccessToken] forHTTPHeaderField:@"Authorization"];
     }
 
