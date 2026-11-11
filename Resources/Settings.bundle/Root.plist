@@ -10,41 +10,15 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
-            <string>KİMLİK DOĞRULAMA (AUTHENTICATION)</string>
+            <string>GOOGLE OAUTH 2.0 (HESAP GİRİŞİ)</string>
             <key>FooterText</key>
-            <string>Google AI Studio API anahtarınızı aistudio.google.com adresinden alıp buraya yapıştırabilirsiniz.</string>
+            <string>Google Cloud Console'dan aldığınız Client ID ve Secret'ı buraya girin. Değişikliklerin anında işlenmesi için aşağıdaki butonu AÇIK yapabilirsiniz.</string>
         </dict>
         <dict>
             <key>Type</key>
             <string>PSTextFieldSpecifier</string>
             <key>Title</key>
-            <string>Gemini API Key</string>
-            <key>Key</key>
-            <string>GeminiClientApiKey</string>
-            <key>DefaultValue</key>
-            <string></string>
-            <key>IsSecure</key>
-            <false/>
-            <key>KeyboardType</key>
-            <string>Alphabet</string>
-            <key>AutocapitalizationType</key>
-            <string>None</string>
-            <key>AutocorrectionType</key>
-            <string>No</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSGroupSpecifier</string>
-            <key>Title</key>
-            <string>GOOGLE OAUTH 2.0 (İSTEĞE BAĞLI)</string>
-            <key>FooterText</key>
-            <string>Google Cloud Console'dan 'TVs and Limited Input Devices' türünde oluşturduğunuz Client ID ve Secret'ı buraya girebilirsiniz.</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSTextFieldSpecifier</string>
-            <key>Title</key>
-            <string>OAuth Client ID</string>
+            <string>Client ID</string>
             <key>Key</key>
             <string>google_oauth_client_id</string>
             <key>DefaultValue</key>
@@ -62,13 +36,59 @@
             <key>Type</key>
             <string>PSTextFieldSpecifier</string>
             <key>Title</key>
-            <string>OAuth Secret</string>
+            <string>Client Secret</string>
             <key>Key</key>
             <string>google_oauth_client_secret</string>
             <key>DefaultValue</key>
             <string></string>
             <key>IsSecure</key>
-            <true/>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSToggleSwitchSpecifier</string>
+            <key>Title</key>
+            <string>🔑 Giriş Kodunu Başlat</string>
+            <key>Key</key>
+            <string>action_trigger_oauth_flow</string>
+            <key>DefaultValue</key>
+            <false/>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSToggleSwitchSpecifier</string>
+            <key>Title</key>
+            <string>🔄 Ayarları &amp; Modelleri Eşitle</string>
+            <key>Key</key>
+            <string>action_sync_settings_and_models</string>
+            <key>DefaultValue</key>
+            <false/>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>GOOGLE AI STUDIO API ANAHTARI</string>
+            <key>FooterText</key>
+            <string>OAuth yerine API anahtarı kullanmak isterseniz buraya yapıştırabilirsiniz.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>API Key</string>
+            <key>Key</key>
+            <string>GeminiClientApiKey</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
             <key>KeyboardType</key>
             <string>Alphabet</string>
             <key>AutocapitalizationType</key>
@@ -80,15 +100,15 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
-            <string>MODEL SEÇİMİ</string>
+            <string>GEMINI MODELİ</string>
             <key>FooterText</key>
-            <string>Kullanmak istediğiniz Gemini model adını yazabilirsiniz (Örn: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash).</string>
+            <string>Kullanmak istediğiniz modeli yazın (Örn: gemini-1.5-flash, gemini-1.5-pro).</string>
         </dict>
         <dict>
             <key>Type</key>
             <string>PSTextFieldSpecifier</string>
             <key>Title</key>
-            <string>Model Adı</string>
+            <string>Model</string>
             <key>Key</key>
             <string>GeminiClientModel</string>
             <key>DefaultValue</key>
@@ -101,66 +121,6 @@
             <string>None</string>
             <key>AutocorrectionType</key>
             <string>No</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSGroupSpecifier</string>
-            <key>Title</key>
-            <string>GELİŞMİŞ API İSTEK AYARLARI</string>
-            <key>FooterText</key>
-            <string>Özel JSON şablonu veya alternatif proxy/endpoint belirleyebilirsiniz.</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSTextFieldSpecifier</string>
-            <key>Title</key>
-            <string>Özel JSON İsteği</string>
-            <key>Key</key>
-            <string>custom_request_payload</string>
-            <key>DefaultValue</key>
-            <string></string>
-            <key>IsSecure</key>
-            <false/>
-            <key>KeyboardType</key>
-            <string>Alphabet</string>
-            <key>AutocapitalizationType</key>
-            <string>None</string>
-            <key>AutocorrectionType</key>
-            <string>No</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSTextFieldSpecifier</string>
-            <key>Title</key>
-            <string>Özel Endpoint URL</string>
-            <key>Key</key>
-            <string>custom_api_endpoint</string>
-            <key>DefaultValue</key>
-            <string></string>
-            <key>IsSecure</key>
-            <false/>
-            <key>KeyboardType</key>
-            <string>URL</string>
-            <key>AutocapitalizationType</key>
-            <string>None</string>
-            <key>AutocorrectionType</key>
-            <string>No</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSGroupSpecifier</string>
-            <key>Title</key>
-            <string>SON YAPILAN HAM İSTEK (SALT OKUNUR)</string>
-        </dict>
-        <dict>
-            <key>Type</key>
-            <string>PSTitleValueSpecifier</string>
-            <key>Title</key>
-            <string>Son İstek</string>
-            <key>Key</key>
-            <string>last_raw_request</string>
-            <key>DefaultValue</key>
-            <string>(Henüz bir istek gönderilmedi)</string>
         </dict>
     </array>
 </dict>
