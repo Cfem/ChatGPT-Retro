@@ -120,7 +120,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     if (cid.length == 0) return @"";
 
     // Scope: Sadece Gemini modelleri ve OpenID profil bilgisi
-    NSString *scope = @"https://www.googleapis.com/auth/generative-language openid email profile";
+    NSString *scope = @"https://www.googleapis.com/auth/generative-language.retriever openid email profile";
     NSString *encodedScope = [scope stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
 
     NSString *redirectUri = [self standardRedirectUri];
@@ -264,7 +264,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
 
-    NSString *scope = @"https://www.googleapis.com/auth/cloud-platform email profile";
+    NSString *scope = @"https://www.googleapis.com/auth/generative-language.retriever email profile";
     NSString *bodyStr = [NSString stringWithFormat:@"client_id=%@&scope=%@", 
                          self.oauthClientId, [scope stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
     [request setHTTPBody:[bodyStr dataUsingEncoding:NSUTF8StringEncoding]];
