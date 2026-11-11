@@ -17,7 +17,7 @@
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
 
 @property (nonatomic, assign) CGFloat keyboardHeight;
-@property (nonatomic, assign) BOOL isStreaming;
+@property (nonatomic, assign) BOOL isSending;
 @property (nonatomic, assign) BOOL isWebSearchActive;
 
 @end
@@ -31,7 +31,6 @@
 
     _messages = [NSMutableArray array];
 
-    // Web arama durumunu NSUserDefaults'tan oku (varsayılan: AÇIK)
     if ([[NSUserDefaults standardUserDefaults] objectForKey:@"enable_google_search"] == nil) {
         _isWebSearchActive = YES;
         [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"enable_google_search"];
@@ -55,11 +54,11 @@
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
     if ([model containsString:@"flash-8b"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.6)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.7)";
     } else if ([model containsString:@"pro"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.6)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.7)";
     } else {
-        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.6)", model ?: @"Gemini 1.5 Flash"];
+        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.7)", model ?: @"Gemini 1.5 Flash"];
     }
 }
 
@@ -102,13 +101,12 @@
     _inputContainerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
     _inputContainerView.backgroundColor = [UIColor colorWithWhite:0.98 alpha:0.95];
 
-    // İnce üst çizgi
     UIView *topLine = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 0.5)];
     topLine.backgroundColor = [UIColor colorWithWhite:0.75 alpha:1.0];
     topLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_inputContainerView addSubview:topLine];
 
-    // 1. SOL: İnternet / Web Arama Butonu (Chatbox'ın hemen solunda)
+    // İnternet / Web Arama Butonu
     _webSearchButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _webSearchButton.frame = CGRectMake(8, 7, 36, 36);
     _webSearchButton.layer.cornerRadius = 18.0;
@@ -119,7 +117,7 @@
     [self updateWebSearchButtonAppearance];
     [_inputContainerView addSubview:_webSearchButton];
 
-    // 2. ORTA: Giriş Kutusu (Chatbox)
+    // Chatbox
     CGFloat textX = 50.0;
     CGFloat textW = w - textX - 68.0;
     _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(textX, 8, textW, 34)];
@@ -136,7 +134,7 @@
     _inputTextField.returnKeyType = UIReturnKeySend;
     [_inputContainerView addSubview:_inputTextField];
 
-    // 3. SAĞ: Gönder butonu
+    // Gönder butonu
     _sendButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _sendButton.frame = CGRectMake(w - 62, 8, 54, 34);
     _sendButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -145,7 +143,7 @@
     [_sendButton addTarget:self action:@selector(sendButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     [_inputContainerView addSubview:_sendButton];
 
-    // Yükleniyor göstergesi
+    // Aktivite göstergesi
     _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     _activityIndicator.center = _sendButton.center;
     _activityIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -172,12 +170,10 @@
 
 - (void)updateWebSearchButtonAppearance {
     if (self.isWebSearchActive) {
-        // Açık: Canlı Mavi Arka Plan, Beyaz/Parlak İkon
         self.webSearchButton.backgroundColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:0.18];
         self.webSearchButton.layer.borderWidth = 1.5;
         self.webSearchButton.layer.borderColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0].CGColor;
     } else {
-        // Kapalı: Düz Açık Gri Arka Plan
         self.webSearchButton.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
         self.webSearchButton.layer.borderWidth = 0.5;
         self.webSearchButton.layer.borderColor = [UIColor colorWithWhite:0.8 alpha:1.0].CGColor;
@@ -186,7 +182,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.6) üzerinde canlı akış ve doğrudan web arama butonu ile çalışıyorum.\n\nİnternette canlı arama yapmak için mesaj kutusunun solundaki 🌐 butonunu maviye (açık) alabilirsiniz!";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.7) üzerinde kararlı modda çalışıyorum.\n\nİnternette canlı arama yapmak için mesaj kutusunun solundaki 🌐 butonunu maviye (açık) alabilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -262,7 +258,7 @@
     } completion:nil];
 }
 
-#pragma mark - Messaging Logic
+#pragma mark - Messaging Logic (Full Response - Zero Freeze)
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
     [self sendButtonTapped];
@@ -271,62 +267,45 @@
 
 - (void)sendButtonTapped {
     NSString *rawText = [self.inputTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (rawText.length == 0 || self.isStreaming) return;
+    if (rawText.length == 0 || self.isSending) return;
 
     if (![[GeminiClient sharedClient] hasApiKey]) {
         [self showApiKeyPrompt];
         return;
     }
 
+    // 1. Kullanıcı mesajını listeye ekle
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
-
-    ChatMessage *geminiMsg = [ChatMessage messageWithText:@"..." sender:ChatMessageSenderGemini];
-    [self.messages addObject:geminiMsg];
 
     [self.tableView reloadData];
     [self scrollToBottomAnimated:YES];
 
     self.inputTextField.text = @"";
     [self setSendingState:YES];
-    self.isStreaming = YES;
+    self.isSending = YES;
 
-    [[GeminiClient sharedClient] streamMessage:rawText 
-                                       history:self.messages 
-                                  chunkHandler:^(NSString *chunk, NSString *accumulatedText, BOOL isFinished, NSError *error) {
+    // 2. Yanıtı Google'dan komple bekle
+    [[GeminiClient sharedClient] sendMessage:rawText 
+                                     history:self.messages 
+                                  completion:^(NSString *response, NSError *error) {
         
-        if (error && accumulatedText.length == 0) {
-            [self setSendingState:NO];
-            self.isStreaming = NO;
-            geminiMsg.text = [NSString stringWithFormat:@"Hata: %@", error.localizedDescription];
-            geminiMsg.cachedHeight = 0;
-            [self.tableView reloadData];
-            return;
-        }
+        [self setSendingState:NO];
+        self.isSending = NO;
 
-        if (accumulatedText.length > 0) {
-            geminiMsg.text = accumulatedText;
-            geminiMsg.cachedHeight = 0;
-        }
-
-        if (isFinished) {
-            [self setSendingState:NO];
-            self.isStreaming = NO;
-            [self.tableView reloadData];
-            [self scrollToBottomAnimated:YES];
+        if (error) {
+            ChatMessage *errChat = [ChatMessage messageWithText:[NSString stringWithFormat:@"Hata: %@", error.localizedDescription] 
+                                                         sender:ChatMessageSenderGemini];
+            [self.messages addObject:errChat];
         } else {
-            [self updateLastMessageCellAnimated:NO];
+            NSString *reply = (response && response.length > 0) ? response : @"(Boş yanıt döndü)";
+            ChatMessage *geminiChat = [ChatMessage messageWithText:reply sender:ChatMessageSenderGemini];
+            [self.messages addObject:geminiChat];
         }
-    }];
-}
 
-- (void)updateLastMessageCellAnimated:(BOOL)animated {
-    if (self.messages.count == 0) return;
-    NSIndexPath *lastPath = [NSIndexPath indexPathForRow:self.messages.count - 1 inSection:0];
-    [UIView performWithoutAnimation:^{
-        [self.tableView reloadRowsAtIndexPaths:@[lastPath] withRowAnimation:UITableViewRowAnimationNone];
+        [self.tableView reloadData];
+        [self scrollToBottomAnimated:YES];
     }];
-    [self scrollToBottomAnimated:NO];
 }
 
 - (void)setSendingState:(BOOL)sending {

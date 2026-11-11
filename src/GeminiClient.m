@@ -9,11 +9,8 @@ static NSString *const kCustomEndpointKey = @"custom_api_endpoint";
 static NSString *const kGoogleSearchEnabledKey = @"enable_google_search";
 static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
-@interface GeminiClient () <NSURLSessionDataDelegate>
+@interface GeminiClient ()
 @property (nonatomic, strong) NSURLSession *session;
-@property (nonatomic, copy) GeminiStreamChunkHandler currentChunkHandler;
-@property (nonatomic, strong) NSMutableString *streamBuffer;
-@property (nonatomic, strong) NSMutableString *accumulatedText;
 @end
 
 @implementation GeminiClient
@@ -34,10 +31,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         _apiKey = [defaults stringForKey:kGeminiApiKeyDefaultsKey] ?: @"";
         _selectedModel = [defaults stringForKey:kGeminiModelDefaultsKey] ?: kDefaultModel;
         _cachedModels = [defaults arrayForKey:kGeminiCachedModelsKey] ?: @[];
-        _streamBuffer = [NSMutableString string];
-        _accumulatedText = [NSMutableString string];
 
-        // Google Search varsayılan olarak açık olsun
         if ([defaults objectForKey:kGoogleSearchEnabledKey] == nil) {
             [defaults setBool:YES forKey:kGoogleSearchEnabledKey];
             [defaults synchronize];
@@ -46,7 +40,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
         config.timeoutIntervalForRequest = 60.0;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        _session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
+        _session = [NSURLSession sessionWithConfiguration:config];
     }
     return self;
 }
@@ -85,7 +79,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"GET"];
 
-    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (completion) completion(nil, error);
@@ -137,22 +131,18 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [task resume];
 }
 
-- (void)streamMessage:(NSString *)prompt 
-              history:(NSArray *)historyMessages 
-         chunkHandler:(GeminiStreamChunkHandler)chunkHandler {
+- (void)sendMessage:(NSString *)prompt 
+            history:(NSArray *)historyMessages 
+         completion:(GeminiCompletionHandler)completion {
     if (![self hasApiKey]) {
-        if (chunkHandler) {
+        if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" 
                                                code:401 
-                                           userInfo:@{NSLocalizedDescriptionKey: @"API Key girilmedi."}];
-            chunkHandler(nil, nil, YES, err);
+                                           userInfo:@{NSLocalizedDescriptionKey: @"API Key girilmedi. Lütfen Ayarlar'dan Google AI Studio API anahtarınızı girin."}];
+            completion(nil, err);
         }
         return;
     }
-
-    self.currentChunkHandler = chunkHandler;
-    [self.streamBuffer setString:@""];
-    [self.accumulatedText setString:@""];
 
     NSString *model = self.selectedModel.length > 0 ? self.selectedModel : kDefaultModel;
     if ([model hasPrefix:@"models/"]) {
@@ -162,9 +152,9 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     NSString *customBaseUrl = [[NSUserDefaults standardUserDefaults] stringForKey:kCustomEndpointKey];
     NSString *urlString;
     if (customBaseUrl && customBaseUrl.length > 5) {
-        urlString = [NSString stringWithFormat:@"%@/models/%@:streamGenerateContent?alt=sse&key=%@", customBaseUrl, model, self.apiKey];
+        urlString = [NSString stringWithFormat:@"%@/models/%@:generateContent?key=%@", customBaseUrl, model, self.apiKey];
     } else {
-        urlString = [NSString stringWithFormat:@"https://generativelanguage.googleapis.com/v1beta/models/%@:streamGenerateContent?alt=sse&key=%@", model, self.apiKey];
+        urlString = [NSString stringWithFormat:@"https://generativelanguage.googleapis.com/v1beta/models/%@:generateContent?key=%@", model, self.apiKey];
     }
 
     NSURL *url = [NSURL URLWithString:urlString];
@@ -172,16 +162,12 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
 
-    // SALT VE TEMİZ DENEYİM:
-    // Arka planda hiçbir yapay sistem talimatı (systemInstruction/persona) eklemiyoruz.
-    // Sadece gerçek kullanıcı mesajları ve gerçek model yanıtları iletiliyor.
+    // Gerçek konuşma geçmişi (Hardcoded karşılama mesajını filtrele)
     NSMutableArray *contents = [NSMutableArray array];
-    
-    // Hardcoded karşılama mesajını geçmişe sokma; sadece gerçek mesajları al
     NSMutableArray *filteredHistory = [NSMutableArray array];
     for (ChatMessage *msg in historyMessages) {
         if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4"] || [msg.text isEqualToString:@"..."]) {
-            continue; // Karşılama ve placeholder mesajlarını API'ye gönderme
+            continue;
         }
         [filteredHistory addObject:msg];
     }
@@ -212,13 +198,11 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         @"maxOutputTokens": @4096
     };
 
-    // Google Search Grounding (Canlı İnternet Araması):
+    // Chatbox solundaki web butonuna göre canlı arama
     BOOL isGoogleSearchEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:kGoogleSearchEnabledKey];
     if (isGoogleSearchEnabled) {
         payloadDict[@"tools"] = @[
-            @{
-                @"googleSearch": @{}
-            }
+            @{ @"googleSearch": @{} }
         ];
     }
 
@@ -237,68 +221,80 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
     [request setHTTPBody:bodyData];
 
-    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request];
-    [task resume];
-}
-
-#pragma mark - NSURLSessionDataDelegate (SSE Stream Parser)
-
-- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveResponse:(NSURLResponse *)response completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
-    completionHandler(NSURLSessionResponseAllow);
-}
-
-- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data {
-    NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    if (!text) return;
-
-    [self.streamBuffer appendString:text];
-
-    while (YES) {
-        NSRange newlineRange = [self.streamBuffer rangeOfString:@"\n"];
-        if (newlineRange.location == NSNotFound) {
-            break;
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, error);
+            });
+            return;
         }
 
-        NSString *line = [self.streamBuffer substringToIndex:newlineRange.location];
-        [self.streamBuffer deleteCharactersInRange:NSMakeRange(0, newlineRange.location + 1)];
-
-        line = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if ([line hasPrefix:@"data: "]) {
-            NSString *jsonString = [line substringFromIndex:6];
-            NSData *jsonData = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
-            if (!jsonData) continue;
-
-            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
-            if (!json) continue;
-
-            NSArray *candidates = json[@"candidates"];
-            if (candidates.count > 0) {
-                NSDictionary *candidate = candidates[0];
-                NSArray *parts = candidate[@"content"][@"parts"];
-                
-                NSMutableString *chunkText = [NSMutableString string];
-                for (NSDictionary *p in parts) {
-                    if (p[@"text"]) {
-                        [chunkText appendString:p[@"text"]];
-                    }
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        if (httpResponse.statusCode != 200) {
+            NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)httpResponse.statusCode];
+            if (data.length > 0) {
+                NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                if (errJson && errJson[@"error"] && errJson[@"error"][@"message"]) {
+                    errMsg = errJson[@"error"][@"message"];
                 }
+            }
+            NSError *apiErr = [NSError errorWithDomain:@"GeminiClient" code:httpResponse.statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, apiErr);
+            });
+            return;
+        }
 
-                if (chunkText.length > 0) {
-                    [self.accumulatedText appendString:chunkText];
-                    if (self.currentChunkHandler) {
-                        self.currentChunkHandler(chunkText, [self.accumulatedText copy], NO, nil);
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSMutableString *fullText = [NSMutableString string];
+        NSMutableArray *sourcesList = [NSMutableArray array];
+
+        NSArray *candidates = json[@"candidates"];
+        if (candidates.count > 0) {
+            NSDictionary *candidate = candidates[0];
+            
+            // 1. Tüm parçaları eksiksiz birleştir
+            NSArray *parts = candidate[@"content"][@"parts"];
+            for (NSDictionary *part in parts) {
+                if (part[@"text"]) {
+                    [fullText appendString:part[@"text"]];
+                }
+            }
+
+            // 2. Google Arama kaynakları (Grounding Metadata)
+            NSDictionary *grounding = candidate[@"groundingMetadata"];
+            if (grounding) {
+                NSArray *chunks = grounding[@"groundingChunks"];
+                for (NSDictionary *c in chunks) {
+                    NSDictionary *web = c[@"web"];
+                    if (web) {
+                        NSString *title = web[@"title"] ?: @"Web Kaynağı";
+                        NSString *uri = web[@"uri"] ?: @"";
+                        if (uri.length > 0) {
+                            [sourcesList addObject:[NSString stringWithFormat:@"• %@ (%@)", title, uri]];
+                        }
                     }
                 }
             }
         }
-    }
-}
 
-- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
-    if (self.currentChunkHandler) {
-        self.currentChunkHandler(@"", [self.accumulatedText copy], YES, error);
-        self.currentChunkHandler = nil;
-    }
+        // Eğer kaynaklar varsa metnin en altına sade metin olarak ekle
+        if (sourcesList.count > 0) {
+            [fullText appendString:@"\n\n---\nKaynaklar:\n"];
+            for (NSString *s in sourcesList) {
+                [fullText appendString:s];
+                [fullText appendString:@"\n"];
+            }
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion([fullText copy], nil);
+            }
+        });
+    }];
+
+    [task resume];
 }
 
 @end
