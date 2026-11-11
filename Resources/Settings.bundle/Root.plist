@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>StringsTable</key>
+    <string>Root</string>
+    <key>PreferenceSpecifiers</key>
+    <array>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>GELİŞMİŞ API İSTEK AYARLARI</string>
+            <key>FooterText</key>
+            <string>Özel JSON isteği şablonu belirleyebilirsiniz. {PROMPT} etiketi yazdığınız mesaj ile otomatik değiştirilir. Boş bırakırsanız standart optimize şablon kullanılır.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Özel JSON İsteği</string>
+            <key>Key</key>
+            <string>custom_request_payload</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Özel Endpoint URL</string>
+            <key>Key</key>
+            <string>custom_api_endpoint</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>URL</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>SON YAPILAN HAM İSTEK (SALT OKUNUR)</string>
+            <key>FooterText</key>
+            <string>Gemini API'ye gönderilen en son ham JSON paketi yukarıda kaydedilmiştir.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTitleValueSpecifier</string>
+            <key>Title</key>
+            <string>Son İstek</string>
+            <key>Key</key>
+            <string>last_raw_request</string>
+            <key>DefaultValue</key>
+            <string>(Henüz bir istek gönderilmedi)</string>
+        </dict>
+    </array>
+</dict>
+</plist>
