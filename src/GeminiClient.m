@@ -113,7 +113,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
 
-    NSString *scope = @"https://www.googleapis.com/auth/generative-language email profile";
+    NSString *scope = @"https://www.googleapis.com/auth/cloud-platform email profile";
     NSString *bodyStr = [NSString stringWithFormat:@"client_id=%@&scope=%@", 
                          self.oauthClientId, [scope stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
     [request setHTTPBody:[bodyStr dataUsingEncoding:NSUTF8StringEncoding]];
