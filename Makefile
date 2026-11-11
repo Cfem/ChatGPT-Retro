@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 APPLICATION_NAME = GeminiRetro
 
 GeminiRetro_FILES = $(wildcard src/*.m)
-GeminiRetro_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore CoreImage AVFoundation
+GeminiRetro_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
 GeminiRetro_CFLAGS = -fobjc-arc -O2 -Wall -Wno-deprecated-declarations -Wno-deprecated-module-dot-map
 GeminiRetro_LDFLAGS = -Wl,-dead_strip -Wl,-undefined,dynamic_lookup
 GeminiRetro_CODESIGN_FLAGS = -S$(CURDIR)/Resources/entitlements.plist

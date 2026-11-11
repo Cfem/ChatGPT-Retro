@@ -123,7 +123,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" 
                                                code:401 
-                                           userInfo:@{NSLocalizedDescriptionKey: @"Lütfen sağ üstteki 'Ayarlar' butonuna dokunarak Gemini API Anahtarınızı girin veya QR kod ile okutun."}];
+                                           userInfo:@{NSLocalizedDescriptionKey: @"Lütfen sağ üstteki 'Ayarlar' butonuna dokunarak Gemini API Anahtarınızı girin."}];
             completion(nil, err);
         }
         return;

@@ -1,8 +1,7 @@
 #import "SettingsViewController.h"
 #import "GeminiClient.h"
-#import "QRScannerViewController.h"
 
-@interface SettingsViewController () <QRScannerDelegate>
+@interface SettingsViewController ()
 
 @property (nonatomic, strong) UITextField *apiKeyField;
 @property (nonatomic, strong) UITextField *modelField;
@@ -37,7 +36,7 @@
 - (void)setupFields {
     // 1. API Key
     _apiKeyField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _apiKeyField.placeholder = @"AIzaSy... (Buraya yapıştırın veya kamerayla tarayın)";
+    _apiKeyField.placeholder = @"AIzaSy... (Buraya yapıştırın)";
     _apiKeyField.text = [GeminiClient sharedClient].apiKey;
     _apiKeyField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
     _apiKeyField.secureTextEntry = YES;
@@ -85,15 +84,6 @@
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)scanApiKeyQRAction {
-    [self.view endEditing:YES];
-    QRScannerViewController *scanner = [[QRScannerViewController alloc] init];
-    scanner.delegate = self;
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:scanner];
-    nav.modalPresentationStyle = UIModalPresentationFormSheet;
-    [self presentViewController:nav animated:YES completion:nil];
-}
-
 - (void)refreshModelsAction {
     [self.view endEditing:YES];
 
@@ -102,7 +92,7 @@
 
     if (![[GeminiClient sharedClient] isAuthenticated]) {
         [self showAlertWithTitle:@"API Anahtarı Gerekli" 
-                         message:@"Modelleri çekebilmek için lütfen önce yukarıdaki kutuya geçerli bir Gemini API Anahtarı girin veya QR kod ile okutun."];
+                         message:@"Modelleri çekebilmek için lütfen önce yukarıdaki kutuya geçerli bir Gemini API Anahtarı girin."];
         return;
     }
 
@@ -150,19 +140,6 @@
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-#pragma mark - QRScannerDelegate
-
-- (void)qrScannerDidScanCode:(NSString *)code {
-    NSString *trimmed = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    self.apiKeyField.text = trimmed;
-    [[GeminiClient sharedClient] saveApiKey:trimmed];
-    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-        [self.delegate settingsDidUpdate];
-    }
-    [self showAlertWithTitle:@"API Anahtarı Okundu"
-                     message:@"API Anahtarınız QR koddan başarıyla alındı ve kaydedildi!"];
-}
-
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
@@ -170,7 +147,7 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 2; // API Key TextField, [Kamerayla QR Koddan API Key Oku]
+    if (section == 0) return 1; // API Key TextField
     if (section == 1) return 2; // Model TextField, [Modelleri Canlı Güncelle]
     if (section == 2) return 1; // [Ayarları Kaydet ve Uygula]
     return 2; // Sistem bilgisi
@@ -184,7 +161,7 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) return @"aistudio.google.com/apikey adresinden ücretsiz alacağınız API anahtarını buraya yapıştırabilir veya bilgisayar/telefon ekranınızdan QR kod olarak okutabilirsiniz.";
+    if (section == 0) return @"aistudio.google.com/apikey adresinden ücretsiz alacağınız API anahtarını buraya yapıştırabilirsiniz.";
     if (section == 1) return @"Yüksek günlük ücretsiz kota (1.500 mesaj/gün) için 'gemini-1.5-flash' veya 'gemini-2.0-flash' modellerini tercih edin.";
     return nil;
 }
@@ -205,15 +182,10 @@
     CGFloat w = tableView.bounds.size.width;
 
     if (indexPath.section == 0) {
-        if (indexPath.row == 0) {
-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = @"API Key";
-            self.apiKeyField.frame = CGRectMake(110, 8, w - 126, 28);
-            [cell.contentView addSubview:self.apiKeyField];
-        } else {
-            cell.textLabel.text = @"📷 Kamerayla QR Koddan API Anahtarı Oku";
-            cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
-        }
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.textLabel.text = @"API Key";
+        self.apiKeyField.frame = CGRectMake(110, 8, w - 126, 28);
+        [cell.contentView addSubview:self.apiKeyField];
     } else if (indexPath.section == 1) {
         if (indexPath.row == 0) {
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -253,9 +225,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
-    if (indexPath.section == 0 && indexPath.row == 1) {
-        [self scanApiKeyQRAction];
-    } else if (indexPath.section == 1 && indexPath.row == 1) {
+    if (indexPath.section == 1 && indexPath.row == 1) {
         if (!self.isFetchingModels) {
             [self refreshModelsAction];
         }
