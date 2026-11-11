@@ -39,6 +39,8 @@
     </array>
     <key>Application-Type</key>
     <string>Default</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Google giriş doğrulama kodunu okumak için kamera erişimi gereklidir.</string>
     <key>CFBundleIcons</key>
     <dict>
         <key>CFBundlePrimaryIcon</key>

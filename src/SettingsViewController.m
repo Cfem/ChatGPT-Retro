@@ -1,7 +1,8 @@
+#import "OAuthModalViewController.h"
 #import "SettingsViewController.h"
 #import "GeminiClient.h"
 
-@interface SettingsViewController ()
+@interface SettingsViewController () <OAuthModalDelegate>
 
 @property (nonatomic, strong) UITextField *clientIdField;
 @property (nonatomic, strong) UITextField *clientSecretField;
@@ -110,7 +111,7 @@
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-#pragma mark - BUTON 2: Google ile Giriş Yap (OAuth)
+#pragma mark - BUTON 2: Google ile Giriş Yap (QR Kod / Kamera / Kod Doğrulama)
 
 - (void)startGoogleOAuthFlow {
     [self.view endEditing:YES];
@@ -119,49 +120,24 @@
     NSString *csec = self.clientSecretField.text ?: @"";
     [[GeminiClient sharedClient] saveOAuthClientId:cid secret:csec];
 
-    if (![[GeminiClient sharedClient] hasOAuthCredentials]) {
-        [self showAlertWithTitle:@"Client ID / Secret Gerekli" 
-                         message:@"Lütfen yukarıdaki Client ID ve Client Secret alanlarını doldurunuz."];
+    if (cid.length == 0) {
+        [self showAlertWithTitle:@"Client ID Gerekli" 
+                         message:@"Lütfen yukarıdaki Client ID alanına Google Cloud Console'dan aldığınız Desktop/Web Client ID'yi yapıştırınız."];
         return;
     }
 
-    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"Google Bağlantısı"
-                                                                     message:@"Cihaz kodu alınıyor, lütfen bekleyin..."
-                                                              preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:loading animated:YES completion:nil];
+    OAuthModalViewController *modal = [[OAuthModalViewController alloc] init];
+    modal.delegate = self;
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:modal];
+    nav.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:nav animated:YES completion:nil];
+}
 
-    [[GeminiClient sharedClient] startDeviceAuthFlowWithCompletion:^(NSString *userCode, NSString *verificationUrl, NSString *deviceCode, NSError *error) {
-        [loading dismissViewControllerAnimated:YES completion:^{
-            if (error) {
-                [self showAlertWithTitle:@"Bağlantı Hatası" message:error.localizedDescription];
-                return;
-            }
-
-            NSString *msg = [NSString stringWithFormat:@"Telefonunuzdan veya bilgisayarınızdan şu adrese gidin:\n\n%@\n\nVe bu kodu girip onaylayın:\n👉 %@ 👈\n\nOnayladıktan sonra bu ekran otomatik kapanacaktır.",
-                             verificationUrl, userCode];
-
-            self.deviceAuthAlert = [UIAlertController alertControllerWithTitle:@"Google Hesabınızı Onaylayın"
-                                                                       message:msg
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-            [self.deviceAuthAlert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-            [self presentViewController:self.deviceAuthAlert animated:YES completion:nil];
-
-            [[GeminiClient sharedClient] pollDeviceTokenWithDeviceCode:deviceCode interval:5 completion:^(BOOL success, NSError *pollErr) {
-                [self.deviceAuthAlert dismissViewControllerAnimated:YES completion:^{
-                    if (success) {
-                        if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                            [self.delegate settingsDidUpdate];
-                        }
-                        [self.tableView reloadData];
-                        [self showAlertWithTitle:@"Giriş Başarılı!" 
-                                         message:@"Google hesabınız başarıyla bağlandı. Artık doğrudan hesabınızla kotasız konuşabilirsiniz."];
-                    } else if (pollErr) {
-                        [self showAlertWithTitle:@"Giriş Tamamlanamadı" message:pollErr.localizedDescription];
-                    }
-                }];
-            }];
-        }];
-    }];
+- (void)oauthModalDidCompleteLogin {
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
+    [self.tableView reloadData];
 }
 
 #pragma mark - BUTON 3: Modelleri Canlı Güncelle (Refresh Models)
@@ -265,7 +241,7 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) return @"Google Cloud Console'dan aldığınız TV/Device Client ID ve Secret'ı girip aşağıdaki butona basabilirsiniz.";
+    if (section == 0) return @"Google Cloud Console'dan (Desktop app) aldığınız Client ID ve Secret'ı girip aşağıdaki butona basarak QR kod veya kamera ile hızlıca bağlanabilirsiniz.";
     if (section == 3) return @"OAuth yerine doğrudan API anahtarıyla kullanmak isterseniz anahtarınızı buraya yazabilirsiniz.";
     return nil;
 }
@@ -297,7 +273,7 @@
             [cell.contentView addSubview:self.clientSecretField];
         } else {
             // BUTON 2: Google ile Giriş Yap (OAuth)
-            cell.textLabel.text = @"🔑 Google ile Giriş Yap (google.com/device)";
+            cell.textLabel.text = @"🔑 Google ile Giriş Yap (QR Kod / Kamera)";
             cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
         }
     } else if (indexPath.section == 1) {
@@ -345,7 +321,7 @@
             cell.detailTextLabel.text = @"iPad Mini 1 (iOS 8.4)";
         } else {
             cell.textLabel.text = @"Sürüm";
-            cell.detailTextLabel.text = @"v2.3 (FormSheet UI)";
+            cell.detailTextLabel.text = @"v2.5 (QR & Camera OAuth)";
         }
     }
 
