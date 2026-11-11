@@ -38,32 +38,47 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         config.timeoutIntervalForRequest = 60.0;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
         _session = [NSURLSession sessionWithConfiguration:config];
+        [self synchronizeSettings];
     }
     return self;
 }
 
+- (void)synchronizeSettings {
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
 - (NSString *)apiKey {
-    return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiApiKeyDefaultsKey] ?: @"";
+    [self synchronizeSettings];
+    NSString *val = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiApiKeyDefaultsKey];
+    return [val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
 }
 
 - (NSString *)selectedModel {
+    [self synchronizeSettings];
     NSString *m = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiModelDefaultsKey];
+    m = [m stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     return (m && m.length > 0) ? m : kDefaultModel;
 }
 
 - (NSString *)oauthClientId {
-    return [[[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientIdKey] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+    [self synchronizeSettings];
+    NSString *val = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientIdKey];
+    return [val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
 }
 
 - (NSString *)oauthClientSecret {
-    return [[[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientSecretKey] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+    [self synchronizeSettings];
+    NSString *val = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientSecretKey];
+    return [val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
 }
 
 - (NSString *)oauthAccessToken {
+    [self synchronizeSettings];
     return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthAccessTokenKey] ?: @"";
 }
 
 - (NSString *)userEmail {
+    [self synchronizeSettings];
     return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthEmailKey] ?: @"";
 }
 
@@ -91,9 +106,12 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 #pragma mark - OAuth Device Flow
 
 - (void)startDeviceAuthFlowWithCompletion:(GeminiDeviceAuthHandler)completion {
+    [self synchronizeSettings];
     if (![self hasOAuthCredentials]) {
         if (completion) {
-            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: @"Lütfen iPad Ayarlar > Gemini menüsünden oluşturduğunuz Client ID ve Client Secret'ı girin."}];
+            NSString *msg = [NSString stringWithFormat:@"Client ID: (%lu karakter), Secret: (%lu karakter). Lütfen iPad Ayarlar uygulamasından çıkıp Gemini uygulamasını açın veya 'Ayarları & Modelleri Eşitle' butonunu açın.",
+                             (unsigned long)self.oauthClientId.length, (unsigned long)self.oauthClientSecret.length];
+            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: msg}];
             completion(nil, nil, nil, err);
         }
         return;
@@ -222,6 +240,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 }
 
 - (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion {
+    [self synchronizeSettings];
     if (![self isAuthenticated]) {
         if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" code:401 userInfo:@{NSLocalizedDescriptionKey: @"Lütfen önce API Key girin veya Google hesabınızı bağlayın."}];
@@ -287,6 +306,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 - (void)sendMessage:(NSString *)prompt 
             history:(NSArray *)historyMessages 
          completion:(GeminiCompletionHandler)completion {
+    [self synchronizeSettings];
     if (![self isAuthenticated]) {
         if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" 
