@@ -54,11 +54,11 @@
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
     if ([model containsString:@"flash-8b"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.7)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.8)";
     } else if ([model containsString:@"pro"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.7)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.8)";
     } else {
-        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.7)", model ?: @"Gemini 1.5 Flash"];
+        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.8)", model ?: @"Gemini 1.5 Flash"];
     }
 }
 
@@ -182,7 +182,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.7) üzerinde kararlı modda çalışıyorum.\n\nİnternette canlı arama yapmak için mesaj kutusunun solundaki 🌐 butonunu maviye (açık) alabilirsiniz!";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.8) üzerinde çalışıyorum.\n\nSağ üstteki 'Ayarlar'dan Google Hesabınızla veya API Anahtarıyla giriş yapabilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -269,7 +269,7 @@
     NSString *rawText = [self.inputTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (rawText.length == 0 || self.isSending) return;
 
-    if (![[GeminiClient sharedClient] hasApiKey]) {
+    if (![[GeminiClient sharedClient] isAuthenticated]) {
         [self showApiKeyPrompt];
         return;
     }
@@ -327,8 +327,8 @@
 }
 
 - (void)showApiKeyPrompt {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Anahtarı Gerekli"
-                                                                   message:@"Gemini ile konuşabilmek için Ayarlar'dan ücretsiz Google AI Studio API anahtarınızı girmeniz gerekmektedir."
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Giriş Gerekli"
+                                                                   message:@"Gemini ile konuşabilmek için Ayarlar'dan Google Hesabınızla giriş yapabilir veya API anahtarınızı tanımlayabilirsiniz."
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'a Git" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
