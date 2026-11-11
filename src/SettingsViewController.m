@@ -5,7 +5,6 @@
 @interface SettingsViewController () <OAuthModalDelegate>
 
 @property (nonatomic, strong) UITextField *clientIdField;
-@property (nonatomic, strong) UITextField *clientSecretField;
 @property (nonatomic, strong) UITextField *apiKeyField;
 @property (nonatomic, strong) UITextField *modelField;
 
@@ -48,15 +47,7 @@
     _clientIdField.autocorrectionType = UITextAutocorrectionTypeNo;
     _clientIdField.clearButtonMode = UITextFieldViewModeWhileEditing;
 
-    // 2. Client Secret
-    _clientSecretField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _clientSecretField.placeholder = @"Örn: GOCSPX-...";
-    _clientSecretField.text = [GeminiClient sharedClient].oauthClientSecret;
-    _clientSecretField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-    _clientSecretField.secureTextEntry = YES;
-    _clientSecretField.autocapitalizationType = UITextAutocapitalizationTypeNone;
-    _clientSecretField.autocorrectionType = UITextAutocorrectionTypeNo;
-    _clientSecretField.clearButtonMode = UITextFieldViewModeWhileEditing;
+
 
     // 3. API Key
     _apiKeyField = [[UITextField alloc] initWithFrame:CGRectZero];
@@ -89,11 +80,10 @@
     [self.view endEditing:YES];
 
     NSString *cid = self.clientIdField.text ?: @"";
-    NSString *csec = self.clientSecretField.text ?: @"";
-    NSString *key = self.apiKeyField.text ?: @"";
+        NSString *key = self.apiKeyField.text ?: @"";
     NSString *model = self.modelField.text ?: @"gemini-1.5-flash";
 
-    [[GeminiClient sharedClient] saveOAuthClientId:cid secret:csec];
+    [[GeminiClient sharedClient] saveOAuthClientId:cid secret:@""];
     [[GeminiClient sharedClient] saveApiKey:key];
     [[GeminiClient sharedClient] saveSelectedModel:model];
 
@@ -101,8 +91,8 @@
         [self.delegate settingsDidUpdate];
     }
 
-    NSString *msg = [NSString stringWithFormat:@"Ayarlar başarıyla kaydedildi!\n\n• Client ID: %lu karakter\n• Client Secret: %lu karakter\n• API Key: %lu karakter\n• Model: %@",
-                     (unsigned long)cid.length, (unsigned long)csec.length, (unsigned long)key.length, model];
+    NSString *msg = [NSString stringWithFormat:@"Ayarlar başarıyla kaydedildi!\n\n• Client ID: %lu karakter\n• API Key: %lu karakter\n• Model: %@",
+                     (unsigned long)cid.length, (unsigned long)key.length, model];
 
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Kaydedildi" message:msg preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -117,8 +107,7 @@
     [self.view endEditing:YES];
 
     NSString *cid = self.clientIdField.text ?: @"";
-    NSString *csec = self.clientSecretField.text ?: @"";
-    [[GeminiClient sharedClient] saveOAuthClientId:cid secret:csec];
+        [[GeminiClient sharedClient] saveOAuthClientId:cid secret:@""];
 
     if (cid.length == 0) {
         [self showAlertWithTitle:@"Client ID Gerekli" 
@@ -217,7 +206,7 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 3; // Client ID, Client Secret, [BUTON 2: Google ile Giriş Yap]
+    if (section == 0) return 2; // Client ID, Client Secret, [BUTON 2: Google ile Giriş Yap]
     if (section == 1) return 1; // [BUTON 1: Ayarları Kaydet ve Uygula]
     if (section == 2) return 2; // Model TextField, [BUTON 3: Modelleri Canlı Güncelle]
     if (section == 3) return 1; // API Key TextField
@@ -241,7 +230,7 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) return @"Google Cloud Console'dan (Desktop app) aldığınız Client ID ve Secret'ı girip aşağıdaki butona basarak QR kod veya kamera ile hızlıca bağlanabilirsiniz.";
+    if (section == 0) return @"Google Cloud Console'dan aldığınız iOS Client ID'yi girip aşağıdaki butona basarak QR kod veya kamera ile hızlıca bağlanabilirsiniz.";
     if (section == 3) return @"OAuth yerine doğrudan API anahtarıyla kullanmak isterseniz anahtarınızı buraya yazabilirsiniz.";
     return nil;
 }
@@ -266,13 +255,8 @@
             cell.textLabel.text = @"Client ID";
             self.clientIdField.frame = CGRectMake(110, 8, w - 126, 28);
             [cell.contentView addSubview:self.clientIdField];
-        } else if (indexPath.row == 1) {
-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = @"Secret";
-            self.clientSecretField.frame = CGRectMake(110, 8, w - 126, 28);
-            [cell.contentView addSubview:self.clientSecretField];
         } else {
-            // BUTON 2: Google ile Giriş Yap (OAuth)
+            // BUTON 2: Google ile Giriş Yap (QR Kod / Kamera)
             cell.textLabel.text = @"🔑 Google ile Giriş Yap (QR Kod / Kamera)";
             cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
         }
@@ -331,7 +315,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
-    if (indexPath.section == 0 && indexPath.row == 2) {
+    if (indexPath.section == 0 && indexPath.row == 1) {
         // Buton 2: Google ile Giriş Yap
         [self startGoogleOAuthFlow];
     } else if (indexPath.section == 1 && indexPath.row == 0) {

@@ -101,16 +101,29 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
 #pragma mark - Standard OAuth 2.0 (Gemini Scope & QR / OOB Flow)
 
+- (NSString *)standardRedirectUri {
+    NSString *cid = [self.oauthClientId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (cid.length == 0) return @"http://localhost";
+
+    // Eğer iOS Client ID ise (.apps.googleusercontent.com) ters çevrilmiş bundle şeması oluştur
+    if ([cid containsString:@".apps.googleusercontent.com"]) {
+        NSArray *parts = [cid componentsSeparatedByString:@"."];
+        NSArray *reversed = [[parts reverseObjectEnumerator] allObjects];
+        NSString *rev = [reversed componentsJoinedByString:@"."];
+        return [NSString stringWithFormat:@"%@:/oauth2redirect", rev];
+    }
+    return @"http://localhost";
+}
+
 - (NSString *)standardOAuthAuthorizationURL {
     NSString *cid = [self.oauthClientId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (cid.length == 0) return @"";
 
-    // Scope: Sadece Gemini modelleri ve profil
-    NSString *scope = @"https://www.googleapis.com/auth/generative-language email profile";
+    // Scope: Sadece Gemini modelleri ve OpenID profil bilgisi
+    NSString *scope = @"https://www.googleapis.com/auth/generative-language openid email profile";
     NSString *encodedScope = [scope stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
 
-    // Standart Desktop / Out-Of-Band Redirect URI
-    NSString *redirectUri = @"http://localhost";
+    NSString *redirectUri = [self standardRedirectUri];
     NSString *encodedRedirect = [redirectUri stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
 
     return [NSString stringWithFormat:@"https://accounts.google.com/o/oauth2/v2/auth?client_id=%@&redirect_uri=%@&response_type=code&scope=%@&prompt=consent&access_type=offline",
@@ -146,7 +159,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
 
-    NSString *redirectUri = @"http://localhost";
+    NSString *redirectUri = [self standardRedirectUri];
     NSString *bodyStr;
     if (self.oauthClientSecret.length > 0) {
         bodyStr = [NSString stringWithFormat:@"client_id=%@&client_secret=%@&code=%@&grant_type=authorization_code&redirect_uri=%@",
