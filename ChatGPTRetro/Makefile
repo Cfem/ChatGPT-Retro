@@ -32,3 +32,6 @@ ipa:: all
 	@cd build && zip -r -9 ../ChatGPTRetro.ipa Payload iTunesMetadata.plist > /dev/null
 	@rm -rf build
 	@echo "==> Successfully created ChatGPTRetro.ipa!"
+
+run:: ipa
+	@$(CURDIR)/../deploy_to_ipad.sh $(THEOS_OBJ_DIR)/ChatGPTRetro.app com.retro.chatgpt
