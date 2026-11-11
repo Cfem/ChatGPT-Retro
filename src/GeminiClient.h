@@ -13,6 +13,7 @@ typedef void (^GeminiExchangeCodeHandler)(BOOL success, NSError *error);
 @property (nonatomic, copy) NSString *oauthClientId;
 @property (nonatomic, copy) NSString *oauthClientSecret;
 @property (nonatomic, copy) NSString *oauthAccessToken;
+@property (nonatomic, copy) NSString *oauthRefreshToken;
 @property (nonatomic, copy) NSString *userEmail;
 
 + (instancetype)sharedClient;
@@ -29,6 +30,7 @@ typedef void (^GeminiExchangeCodeHandler)(BOOL success, NSError *error);
 // Out-of-band / Standard OAuth (Gemini only scope)
 - (NSString *)standardOAuthAuthorizationURL;
 - (void)exchangeAuthCode:(NSString *)rawInput completion:(GeminiExchangeCodeHandler)completion;
+- (void)refreshAccessTokenIfNeededWithCompletion:(void (^)(BOOL refreshed))completion;
 
 // Device Flow (RFC 8628 fallback)
 - (void)startDeviceAuthFlowWithCompletion:(GeminiDeviceAuthHandler)completion;
