@@ -38,6 +38,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         _oauthClientId = [defaults stringForKey:kGeminiOAuthClientIdKey] ?: @"";
         _oauthClientSecret = [defaults stringForKey:kGeminiOAuthClientSecretKey] ?: @"";
         _oauthAccessToken = [defaults stringForKey:kGeminiOAuthAccessTokenKey] ?: @"";
+        _oauthRefreshToken = [defaults stringForKey:kGeminiOAuthRefreshTokenKey] ?: @"";
         _userEmail = [defaults stringForKey:kGeminiOAuthEmailKey] ?: @"";
 
         if ([defaults objectForKey:kGoogleSearchEnabledKey] == nil) {
@@ -76,6 +77,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
 - (void)signOutGoogleAccount {
     _oauthAccessToken = @"";
+    _oauthRefreshToken = @"";
     _userEmail = @"";
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthAccessTokenKey];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthRefreshTokenKey];
@@ -170,7 +172,10 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         if (accessToken && accessToken.length > 0) {
             self.oauthAccessToken = accessToken;
             [[NSUserDefaults standardUserDefaults] setObject:accessToken forKey:kGeminiOAuthAccessTokenKey];
-            if (refreshToken) [[NSUserDefaults standardUserDefaults] setObject:refreshToken forKey:kGeminiOAuthRefreshTokenKey];
+            if (refreshToken && refreshToken.length > 0) {
+                self.oauthRefreshToken = refreshToken;
+                [[NSUserDefaults standardUserDefaults] setObject:refreshToken forKey:kGeminiOAuthRefreshTokenKey];
+            }
             [[NSUserDefaults standardUserDefaults] synchronize];
 
             [self fetchUserEmail:accessToken];
@@ -188,6 +193,46 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         });
     }];
     [task resume];
+}
+
+- (void)refreshAccessTokenIfNeededWithCompletion:(void (^)(BOOL refreshed))completion {
+    if (self.oauthRefreshToken.length == 0 || self.oauthClientId.length == 0) {
+        if (completion) completion(NO);
+        return;
+    }
+
+    NSURL *tokenUrl = [NSURL URLWithString:@"https://oauth2.googleapis.com/token"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:tokenUrl];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+
+    NSString *bodyStr;
+    if (self.oauthClientSecret.length > 0) {
+        bodyStr = [NSString stringWithFormat:@"client_id=%@&client_secret=%@&refresh_token=%@&grant_type=refresh_token",
+                   self.oauthClientId, self.oauthClientSecret, self.oauthRefreshToken];
+    } else {
+        bodyStr = [NSString stringWithFormat:@"client_id=%@&refresh_token=%@&grant_type=refresh_token",
+                   self.oauthClientId, self.oauthRefreshToken];
+    }
+    [request setHTTPBody:[bodyStr dataUsingEncoding:NSUTF8StringEncoding]];
+
+    [[self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (!data) {
+            if (completion) completion(NO);
+            return;
+        }
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSString *newAccessToken = json[@"access_token"];
+        if (newAccessToken && newAccessToken.length > 0) {
+            self.oauthAccessToken = newAccessToken;
+            [[NSUserDefaults standardUserDefaults] setObject:newAccessToken forKey:kGeminiOAuthAccessTokenKey];
+            [[NSUserDefaults standardUserDefaults] synchronize];
+            if (completion) completion(YES);
+        } else {
+            if (completion) completion(NO);
+        }
+    }] resume];
 }
 
 #pragma mark - OAuth Device Flow
@@ -473,6 +518,21 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         }
 
         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        if (httpResponse.statusCode == 401 && self.oauthRefreshToken.length > 0) {
+            // Token süresi dolmuş, refresh_token ile arka planda sessizce yenile ve mesajı tekrar dene
+            [self refreshAccessTokenIfNeededWithCompletion:^(BOOL refreshed) {
+                if (refreshed) {
+                    [self sendMessage:prompt history:historyMessages completion:completion];
+                } else {
+                    NSError *apiErr = [NSError errorWithDomain:@"GeminiClient" code:401 userInfo:@{NSLocalizedDescriptionKey: @"Google oturum süresi doldu. Lütfen Ayarlar'dan tekrar giriş yapın."}];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (completion) completion(nil, apiErr);
+                    });
+                }
+            }];
+            return;
+        }
+
         if (httpResponse.statusCode != 200) {
             NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)httpResponse.statusCode];
             if (data.length > 0) {
