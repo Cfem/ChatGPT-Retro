@@ -6,6 +6,7 @@ static NSString *const kGeminiModelDefaultsKey = @"GeminiClientModel";
 static NSString *const kGeminiCachedModelsKey = @"GeminiClientCachedModels";
 static NSString *const kCustomPayloadTemplateKey = @"custom_request_payload";
 static NSString *const kCustomEndpointKey = @"custom_api_endpoint";
+static NSString *const kGoogleSearchEnabledKey = @"enable_google_search";
 static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
 @interface GeminiClient () <NSURLSessionDataDelegate>
@@ -35,6 +36,12 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         _cachedModels = [defaults arrayForKey:kGeminiCachedModelsKey] ?: @[];
         _streamBuffer = [NSMutableString string];
         _accumulatedText = [NSMutableString string];
+
+        // Google Search varsayılan olarak açık olsun
+        if ([defaults objectForKey:kGoogleSearchEnabledKey] == nil) {
+            [defaults setBool:YES forKey:kGoogleSearchEnabledKey];
+            [defaults synchronize];
+        }
 
         NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
         config.timeoutIntervalForRequest = 60.0;
@@ -165,15 +172,27 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
 
-    // Son konuşma geçmişini derle (RAM korumalı)
+    // SALT VE TEMİZ DENEYİM:
+    // Arka planda hiçbir yapay sistem talimatı (systemInstruction/persona) eklemiyoruz.
+    // Sadece gerçek kullanıcı mesajları ve gerçek model yanıtları iletiliyor.
     NSMutableArray *contents = [NSMutableArray array];
-    NSInteger startIndex = 0;
-    if (historyMessages.count > 8) {
-        startIndex = historyMessages.count - 8;
+    
+    // Hardcoded karşılama mesajını geçmişe sokma; sadece gerçek mesajları al
+    NSMutableArray *filteredHistory = [NSMutableArray array];
+    for (ChatMessage *msg in historyMessages) {
+        if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4"] || [msg.text isEqualToString:@"..."]) {
+            continue; // Karşılama ve placeholder mesajlarını API'ye gönderme
+        }
+        [filteredHistory addObject:msg];
     }
 
-    for (NSInteger i = startIndex; i < historyMessages.count; i++) {
-        ChatMessage *msg = historyMessages[i];
+    NSInteger startIndex = 0;
+    if (filteredHistory.count > 8) {
+        startIndex = filteredHistory.count - 8;
+    }
+
+    for (NSInteger i = startIndex; i < filteredHistory.count; i++) {
+        ChatMessage *msg = filteredHistory[i];
         NSString *role = (msg.sender == ChatMessageSenderUser) ? @"user" : @"model";
         [contents addObject:@{
             @"role": role,
@@ -186,13 +205,22 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         @"parts": @[ @{ @"text": prompt ?: @"" } ]
     }];
 
-    NSDictionary *payloadDict = @{
-        @"contents": contents,
-        @"generationConfig": @{
-            @"temperature": @0.7,
-            @"maxOutputTokens": @4096
-        }
+    NSMutableDictionary *payloadDict = [NSMutableDictionary dictionary];
+    payloadDict[@"contents"] = contents;
+    payloadDict[@"generationConfig"] = @{
+        @"temperature": @0.7,
+        @"maxOutputTokens": @4096
     };
+
+    // Google Search Grounding (Canlı İnternet Araması):
+    BOOL isGoogleSearchEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:kGoogleSearchEnabledKey];
+    if (isGoogleSearchEnabled) {
+        payloadDict[@"tools"] = @[
+            @{
+                @"googleSearch": @{}
+            }
+        ];
+    }
 
     NSData *bodyData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
     
@@ -216,10 +244,6 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 #pragma mark - NSURLSessionDataDelegate (SSE Stream Parser)
 
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveResponse:(NSURLResponse *)response completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
-    NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
-    if (http.statusCode != 200) {
-        // Hata durumunda da akışı bitir
-    }
     completionHandler(NSURLSessionResponseAllow);
 }
 
@@ -229,7 +253,6 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
     [self.streamBuffer appendString:text];
 
-    // SSE Satırlarını ayrıştır ("data: { ... }")
     while (YES) {
         NSRange newlineRange = [self.streamBuffer rangeOfString:@"\n"];
         if (newlineRange.location == NSNotFound) {
@@ -253,7 +276,6 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
                 NSDictionary *candidate = candidates[0];
                 NSArray *parts = candidate[@"content"][@"parts"];
                 
-                // TÜM PART'LARI EKSİKSİZ BİRLEŞTİR (1. 2. 3. blokları asla kaçırma)
                 NSMutableString *chunkText = [NSMutableString string];
                 for (NSDictionary *p in parts) {
                     if (p[@"text"]) {

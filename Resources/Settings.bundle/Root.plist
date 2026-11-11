@@ -10,6 +10,24 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
+            <string>ÖZELLİKLER &amp; ARAÇLAR</string>
+            <key>FooterText</key>
+            <string>Açık olduğunda Gemini yanıt verirken güncel bilgilere erişmek için Google Arama'yı (Grounding) kullanabilir.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSToggleSwitchSpecifier</string>
+            <key>Title</key>
+            <string>Google İnternet Araması</string>
+            <key>Key</key>
+            <string>enable_google_search</string>
+            <key>DefaultValue</key>
+            <true/>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
             <string>GELİŞMİŞ API İSTEK AYARLARI</string>
             <key>FooterText</key>
             <string>Özel JSON isteği şablonu belirleyebilirsiniz. {PROMPT} etiketi yazdığınız mesaj ile otomatik değiştirilir. Boş bırakırsanız standart optimize şablon kullanılır.</string>

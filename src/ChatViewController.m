@@ -48,11 +48,11 @@
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
     if ([model containsString:@"flash-8b"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.4)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.5)";
     } else if ([model containsString:@"pro"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.4)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.5)";
     } else {
-        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.4)", model ?: @"Gemini 1.5 Flash"];
+        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.5)", model ?: @"Gemini 1.5 Flash"];
     }
 }
 
@@ -133,7 +133,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.4) üzerinde canlı akış ile çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonundan ücretsiz Google AI Studio API anahtarınızı tanımlayabilirsiniz.";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.5) üzerinde canlı akış ve Google Arama ile çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonundan ücretsiz Google AI Studio API anahtarınızı tanımlayabilirsiniz.";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
