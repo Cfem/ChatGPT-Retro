@@ -11,15 +11,14 @@
 
 // Giriş çubuğu bileşenleri
 @property (nonatomic, strong) UIView *inputContainerView;
+@property (nonatomic, strong) UIButton *webSearchButton;
 @property (nonatomic, strong) UITextField *inputTextField;
 @property (nonatomic, strong) UIButton *sendButton;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
 
 @property (nonatomic, assign) CGFloat keyboardHeight;
-
-// Canlı akış sırasında tabloyu A5 CPU'yu yormadan aralıklarla güncelleme zamanlayıcısı
-@property (nonatomic, strong) NSTimer *streamUpdateTimer;
 @property (nonatomic, assign) BOOL isStreaming;
+@property (nonatomic, assign) BOOL isWebSearchActive;
 
 @end
 
@@ -31,6 +30,14 @@
     self.view.backgroundColor = [UIColor colorWithRed:0.96 green:0.96 blue:0.98 alpha:1.0];
 
     _messages = [NSMutableArray array];
+
+    // Web arama durumunu NSUserDefaults'tan oku (varsayılan: AÇIK)
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"enable_google_search"] == nil) {
+        _isWebSearchActive = YES;
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"enable_google_search"];
+    } else {
+        _isWebSearchActive = [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_google_search"];
+    }
 
     [self setupNavigationItems];
     [self setupTableView];
@@ -48,11 +55,11 @@
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
     if ([model containsString:@"flash-8b"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.5)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.6)";
     } else if ([model containsString:@"pro"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.5)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.6)";
     } else {
-        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.5)", model ?: @"Gemini 1.5 Flash"];
+        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.6)", model ?: @"Gemini 1.5 Flash"];
     }
 }
 
@@ -95,12 +102,27 @@
     _inputContainerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
     _inputContainerView.backgroundColor = [UIColor colorWithWhite:0.98 alpha:0.95];
 
+    // İnce üst çizgi
     UIView *topLine = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 0.5)];
     topLine.backgroundColor = [UIColor colorWithWhite:0.75 alpha:1.0];
     topLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_inputContainerView addSubview:topLine];
 
-    _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(12, 8, w - 80, 34)];
+    // 1. SOL: İnternet / Web Arama Butonu (Chatbox'ın hemen solunda)
+    _webSearchButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _webSearchButton.frame = CGRectMake(8, 7, 36, 36);
+    _webSearchButton.layer.cornerRadius = 18.0;
+    _webSearchButton.layer.masksToBounds = YES;
+    [_webSearchButton setTitle:@"🌐" forState:UIControlStateNormal];
+    _webSearchButton.titleLabel.font = [UIFont systemFontOfSize:19.0];
+    [_webSearchButton addTarget:self action:@selector(toggleWebSearch) forControlEvents:UIControlEventTouchUpInside];
+    [self updateWebSearchButtonAppearance];
+    [_inputContainerView addSubview:_webSearchButton];
+
+    // 2. ORTA: Giriş Kutusu (Chatbox)
+    CGFloat textX = 50.0;
+    CGFloat textW = w - textX - 68.0;
+    _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(textX, 8, textW, 34)];
     _inputTextField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _inputTextField.placeholder = @"Gemini'ye bir soru sor...";
     _inputTextField.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
@@ -114,14 +136,16 @@
     _inputTextField.returnKeyType = UIReturnKeySend;
     [_inputContainerView addSubview:_inputTextField];
 
+    // 3. SAĞ: Gönder butonu
     _sendButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _sendButton.frame = CGRectMake(w - 62, 8, 52, 34);
+    _sendButton.frame = CGRectMake(w - 62, 8, 54, 34);
     _sendButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
     [_sendButton setTitle:@"Gönder" forState:UIControlStateNormal];
     _sendButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
     [_sendButton addTarget:self action:@selector(sendButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     [_inputContainerView addSubview:_sendButton];
 
+    // Yükleniyor göstergesi
     _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     _activityIndicator.center = _sendButton.center;
     _activityIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -131,9 +155,38 @@
     [self.view addSubview:_inputContainerView];
 }
 
+- (void)toggleWebSearch {
+    self.isWebSearchActive = !self.isWebSearchActive;
+    [[NSUserDefaults standardUserDefaults] setBool:self.isWebSearchActive forKey:@"enable_google_search"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+
+    [UIView animateWithDuration:0.2 animations:^{
+        [self updateWebSearchButtonAppearance];
+        self.webSearchButton.transform = CGAffineTransformMakeScale(1.15, 1.15);
+    } completion:^(BOOL finished) {
+        [UIView animateWithDuration:0.15 animations:^{
+            self.webSearchButton.transform = CGAffineTransformIdentity;
+        }];
+    }];
+}
+
+- (void)updateWebSearchButtonAppearance {
+    if (self.isWebSearchActive) {
+        // Açık: Canlı Mavi Arka Plan, Beyaz/Parlak İkon
+        self.webSearchButton.backgroundColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:0.18];
+        self.webSearchButton.layer.borderWidth = 1.5;
+        self.webSearchButton.layer.borderColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0].CGColor;
+    } else {
+        // Kapalı: Düz Açık Gri Arka Plan
+        self.webSearchButton.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
+        self.webSearchButton.layer.borderWidth = 0.5;
+        self.webSearchButton.layer.borderColor = [UIColor colorWithWhite:0.8 alpha:1.0].CGColor;
+    }
+}
+
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.5) üzerinde canlı akış ve Google Arama ile çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonundan ücretsiz Google AI Studio API anahtarınızı tanımlayabilirsiniz.";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.6) üzerinde canlı akış ve doğrudan web arama butonu ile çalışıyorum.\n\nİnternette canlı arama yapmak için mesaj kutusunun solundaki 🌐 butonunu maviye (açık) alabilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -209,7 +262,7 @@
     } completion:nil];
 }
 
-#pragma mark - Messaging Logic (Live SSE Streaming)
+#pragma mark - Messaging Logic
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
     [self sendButtonTapped];
@@ -225,11 +278,9 @@
         return;
     }
 
-    // 1. Kullanıcı mesajını listeye ekle
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
 
-    // 2. Gemini için boş bir yanıt balonu hazırla (Canlı akış buraya yazılacak)
     ChatMessage *geminiMsg = [ChatMessage messageWithText:@"..." sender:ChatMessageSenderGemini];
     [self.messages addObject:geminiMsg];
 
@@ -240,7 +291,6 @@
     [self setSendingState:YES];
     self.isStreaming = YES;
 
-    // 3. Canlı akışı başlat (streamGenerateContent)
     [[GeminiClient sharedClient] streamMessage:rawText 
                                        history:self.messages 
                                   chunkHandler:^(NSString *chunk, NSString *accumulatedText, BOOL isFinished, NSError *error) {
@@ -256,7 +306,7 @@
 
         if (accumulatedText.length > 0) {
             geminiMsg.text = accumulatedText;
-            geminiMsg.cachedHeight = 0; // Dinamik olarak yeniden hesapla
+            geminiMsg.cachedHeight = 0;
         }
 
         if (isFinished) {
@@ -265,7 +315,6 @@
             [self.tableView reloadData];
             [self scrollToBottomAnimated:YES];
         } else {
-            // A5 çipini yormamak için her chunk geldiğinde görünür hücreyi güncelle
             [self updateLastMessageCellAnimated:NO];
         }
     }];
@@ -274,8 +323,6 @@
 - (void)updateLastMessageCellAnimated:(BOOL)animated {
     if (self.messages.count == 0) return;
     NSIndexPath *lastPath = [NSIndexPath indexPathForRow:self.messages.count - 1 inSection:0];
-    
-    // Tabloyu tamamen yeniden çizmek yerine sadece son satırı yeniden yükle (RAM & CPU dostu)
     [UIView performWithoutAnimation:^{
         [self.tableView reloadRowsAtIndexPaths:@[lastPath] withRowAnimation:UITableViewRowAnimationNone];
     }];
