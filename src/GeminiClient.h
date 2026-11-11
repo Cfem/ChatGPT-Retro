@@ -1,7 +1,6 @@
 #import <Foundation/Foundation.h>
 
 typedef void (^GeminiCompletionHandler)(NSString *response, NSError *error);
-typedef void (^GeminiStreamChunkHandler)(NSString *chunk, NSString *accumulatedText, BOOL isFinished, NSError *error);
 typedef void (^GeminiModelsHandler)(NSArray *models, NSError *error);
 
 @interface GeminiClient : NSObject
@@ -19,9 +18,9 @@ typedef void (^GeminiModelsHandler)(NSArray *models, NSError *error);
 - (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion;
 - (NSString *)customRequestPayloadTemplate;
 
-// SSE (Server-Sent Events) ile parça parça canlı akış yöntemi
-- (void)streamMessage:(NSString *)prompt 
-              history:(NSArray *)historyMessages 
-         chunkHandler:(GeminiStreamChunkHandler)chunkHandler;
+// Yanıtı komple bekleyip tek seferde getiren kararlı metot (Kaynaklar dahil)
+- (void)sendMessage:(NSString *)prompt 
+            history:(NSArray *)historyMessages 
+         completion:(GeminiCompletionHandler)completion;
 
 @end
