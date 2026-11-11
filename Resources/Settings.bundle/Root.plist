@@ -12,7 +12,7 @@
             <key>Title</key>
             <string>GOOGLE OAUTH 2.0 (HESAP GİRİŞİ)</string>
             <key>FooterText</key>
-            <string>Google Cloud Console'dan aldığınız Client ID ve Secret'ı buraya girin. Değişikliklerin anında işlenmesi için aşağıdaki butonu AÇIK yapabilirsiniz.</string>
+            <string>Google Cloud Console'dan aldığınız TV/Device Client ID ve Secret'ı buraya yapıştırın.</string>
         </dict>
         <dict>
             <key>Type</key>
@@ -52,23 +52,35 @@
         </dict>
         <dict>
             <key>Type</key>
-            <string>PSToggleSwitchSpecifier</string>
+            <string>PSGroupSpecifier</string>
             <key>Title</key>
-            <string>🔑 Giriş Kodunu Başlat</string>
-            <key>Key</key>
-            <string>action_trigger_oauth_flow</string>
-            <key>DefaultValue</key>
-            <false/>
+            <string>İŞLEM BUTONLARI</string>
+            <key>FooterText</key>
+            <string>Yukarıdaki kutucukları doldurduktan sonra bu butonlara dokunarak işlemi doğrudan başlatabilirsiniz.</string>
         </dict>
         <dict>
             <key>Type</key>
-            <string>PSToggleSwitchSpecifier</string>
+            <string>IHTTPSpecifier</string>
             <key>Title</key>
-            <string>🔄 Ayarları &amp; Modelleri Eşitle</string>
-            <key>Key</key>
-            <string>action_sync_settings_and_models</string>
-            <key>DefaultValue</key>
-            <false/>
+            <string>📥 Ayarları Uygulamaya Kaydet / Aktar</string>
+            <key>File</key>
+            <string>geminiretro://push-settings</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>IHTTPSpecifier</string>
+            <key>Title</key>
+            <string>🔑 Google ile Giriş Yap (OAuth)</string>
+            <key>File</key>
+            <string>geminiretro://start-oauth</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>IHTTPSpecifier</string>
+            <key>Title</key>
+            <string>🔄 Modelleri Güncelle</string>
+            <key>File</key>
+            <string>geminiretro://update-models</string>
         </dict>
         <dict>
             <key>Type</key>

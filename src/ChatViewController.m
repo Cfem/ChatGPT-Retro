@@ -48,57 +48,18 @@
                                                  name:NSUserDefaultsDidChangeNotification
                                                object:nil];
 
-    // Uygulama ön plana geldiğinde (Ayarlar'dan dönünce) tetikleyicileri kontrol et
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(appDidBecomeActive:)
-                                                 name:UIApplicationDidBecomeActiveNotification
-                                               object:nil];
-
     [self addWelcomeMessageIfNeeded];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self updateTitleWithModel];
-    [self checkSettingsActions];
-}
-
-- (void)appDidBecomeActive:(NSNotification *)note {
-    [self checkSettingsActions];
 }
 
 - (void)userDefaultsDidChange:(NSNotification *)note {
     dispatch_async(dispatch_get_main_queue(), ^{
         [self updateTitleWithModel];
-        [self checkSettingsActions];
     });
-}
-
-// iOS Ayarlar uygulamasından butonlar (toggle) açıldı mı kontrol et
-- (void)checkSettingsActions {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults synchronize];
-
-    // 1. Ayarlar uygulamasından "🔑 Giriş Kodunu Başlat" açıldı mı?
-    if ([defaults boolForKey:@"action_trigger_oauth_flow"]) {
-        [defaults setBool:NO forKey:@"action_trigger_oauth_flow"];
-        [defaults synchronize];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self startGoogleOAuthFlow];
-        });
-        return;
-    }
-
-    // 2. Ayarlar uygulamasından "🔄 Ayarları & Modelleri Eşitle" açıldı mı?
-    if ([defaults boolForKey:@"action_sync_settings_and_models"]) {
-        [defaults setBool:NO forKey:@"action_sync_settings_and_models"];
-        [defaults synchronize];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self updateTitleWithModel];
-            [self refreshModelsAction];
-        });
-        return;
-    }
 }
 
 - (void)updateTitleWithModel {
@@ -109,7 +70,7 @@
     } else if ([GeminiClient sharedClient].apiKey.length > 5) {
         authStatus = @" [API Key]";
     }
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.1)", model ?: @"gemini-1.5-flash", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.2)", model ?: @"gemini-1.5-flash", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -141,7 +102,7 @@
             [self showAlertWithTitle:@"Çıkış Yapıldı" message:@"Google hesabınızın bağlantısı kaldırıldı."];
         }]];
     } else {
-        [sheet addAction:[UIAlertAction actionWithTitle:@"🔑 Google Hesabı Bağla (google.com/device)"
+        [sheet addAction:[UIAlertAction actionWithTitle:@"🔑 Google Hesabı Bağla (OAuth)"
                                                   style:UIAlertActionStyleDefault
                                                 handler:^(UIAlertAction *action) {
             [self startGoogleOAuthFlow];
@@ -154,19 +115,10 @@
         [self refreshModelsAction];
     }]];
 
-    // Mevcut Client ID & Key durumunu gösteren bilgi butonu
-    NSString *keyInfo = [NSString stringWithFormat:@"Client ID: %lu karakter | Key: %lu karakter",
-                         (unsigned long)[GeminiClient sharedClient].oauthClientId.length,
-                         (unsigned long)[GeminiClient sharedClient].apiKey.length];
-
-    [sheet addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"ℹ️ Ayar Durumu: %@", keyInfo]
+    [sheet addAction:[UIAlertAction actionWithTitle:@"📥 Ayarları Senkronize Et / Kontrol Et"
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction *action) {
-        NSString *fullInfo = [NSString stringWithFormat:@"Client ID:\n%@\n\nSecret:\n%@\n\nAPI Key:\n%@",
-                              [GeminiClient sharedClient].oauthClientId.length > 0 ? [GeminiClient sharedClient].oauthClientId : @"(Girilmedi)",
-                              [GeminiClient sharedClient].oauthClientSecret.length > 0 ? @"•••••••• (Dolu)" : @"(Girilmedi)",
-                              [GeminiClient sharedClient].apiKey.length > 0 ? @"•••••••• (Dolu)" : @"(Girilmedi)"];
-        [self showAlertWithTitle:@"Kaydedilen Ayarlar" message:fullInfo];
+        [self handlePushSettingsAction];
     }]];
 
     [sheet addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
@@ -175,11 +127,26 @@
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
+#pragma mark - Custom URL Scheme Action Handlers
+
+- (void)handlePushSettingsAction {
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self updateTitleWithModel];
+
+    NSString *msg = [NSString stringWithFormat:@"Ayarlar başarıyla uygulamaya aktarıldı!\n\n• Client ID: %lu karakter\n• Client Secret: %lu karakter\n• API Key: %lu karakter\n• Model: %@",
+                     (unsigned long)[GeminiClient sharedClient].oauthClientId.length,
+                     (unsigned long)[GeminiClient sharedClient].oauthClientSecret.length,
+                     (unsigned long)[GeminiClient sharedClient].apiKey.length,
+                     [GeminiClient sharedClient].selectedModel];
+
+    [self showAlertWithTitle:@"Ayarlar Kaydedildi" message:msg];
+}
+
 - (void)startGoogleOAuthFlow {
     [[NSUserDefaults standardUserDefaults] synchronize];
 
     if (![[GeminiClient sharedClient] hasOAuthCredentials]) {
-        NSString *msg = [NSString stringWithFormat:@"Client ID (%lu karakter) veya Secret (%lu karakter) eksik.\n\nLütfen iPad Ayarlar uygulamasında girdikten sonra klavyedeki 'Bitti'ye basın veya uygulamadaki 'Ayar Durumu' butonundan kontrol edin.",
+        NSString *msg = [NSString stringWithFormat:@"Client ID (%lu karakter) veya Secret (%lu karakter) eksik.\n\nLütfen iPad Ayarlar uygulamasından Client ID ve Secret'ı girip altındaki '📥 Ayarları Uygulamaya Kaydet / Aktar' butonuna dokunun.",
                          (unsigned long)[GeminiClient sharedClient].oauthClientId.length,
                          (unsigned long)[GeminiClient sharedClient].oauthClientSecret.length];
         [self showAlertWithTitle:@"Client ID / Secret Eksik" message:msg];
@@ -375,7 +342,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.1) üzerinde çalışıyorum.\n\nSağ üstteki 'İşlemler'den Google Hesabınızı bağlayabilir veya modelleri canlı listeleyebilirsiniz!";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.2) üzerinde çalışıyorum.\n\nİşlem yapmak için sağ üstteki 'İşlemler' butonunu veya iPad Ayarları'ndaki doğrudan butonları kullanabilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
