@@ -26,6 +26,8 @@
     <array>
         <string>iPhoneOS</string>
     </array>
+    <key>Application-Type</key>
+    <string>Default</string>
     <key>CFBundleIcons</key>
     <dict>
         <key>CFBundlePrimaryIcon</key>
