@@ -3,7 +3,9 @@
 #import "ChatMessage.h"
 #import "GeminiClient.h"
 
-@interface ChatViewController ()
+#import "SettingsViewController.h"
+
+@interface ChatViewController () <SettingsViewControllerDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray *messages;
@@ -70,7 +72,7 @@
     } else if ([GeminiClient sharedClient].apiKey.length > 5) {
         authStatus = @" [API Key]";
     }
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.2)", model ?: @"gemini-1.5-flash", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.3)", model ?: @"gemini-1.5-flash", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -79,52 +81,22 @@
                                                                             target:self
                                                                             action:@selector(clearChatTapped)];
 
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"İşlemler / Ayarlar"
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Ayarlar"
                                                                               style:UIBarButtonItemStylePlain
                                                                              target:self
                                                                              action:@selector(openSettingsTapped)];
 }
 
 - (void)openSettingsTapped {
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    SettingsViewController *settingsVC = [[SettingsViewController alloc] init];
+    settingsVC.delegate = self;
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:settingsVC];
+    nav.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:nav animated:YES completion:nil];
+}
 
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Gemini İşlemleri"
-                                                                   message:@"Google Hesabı bağlantısı ve canlı model listesi:"
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-
-    if ([GeminiClient sharedClient].isGoogleAccountLinked) {
-        NSString *email = [GeminiClient sharedClient].userEmail.length > 0 ? [GeminiClient sharedClient].userEmail : @"Bağlı Hesap";
-        [sheet addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"🔴 Google Hesabından Çıkış Yap (%@)", email]
-                                                  style:UIAlertActionStyleDestructive
-                                                handler:^(UIAlertAction *action) {
-            [[GeminiClient sharedClient] signOutGoogleAccount];
-            [self updateTitleWithModel];
-            [self showAlertWithTitle:@"Çıkış Yapıldı" message:@"Google hesabınızın bağlantısı kaldırıldı."];
-        }]];
-    } else {
-        [sheet addAction:[UIAlertAction actionWithTitle:@"🔑 Google Hesabı Bağla (OAuth)"
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(UIAlertAction *action) {
-            [self startGoogleOAuthFlow];
-        }]];
-    }
-
-    [sheet addAction:[UIAlertAction actionWithTitle:@"🔄 Modelleri Canlı Yenile (Refresh Models)"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-        [self refreshModelsAction];
-    }]];
-
-    [sheet addAction:[UIAlertAction actionWithTitle:@"📥 Ayarları Senkronize Et / Kontrol Et"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-        [self handlePushSettingsAction];
-    }]];
-
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-
-    sheet.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItem;
-    [self presentViewController:sheet animated:YES completion:nil];
+- (void)settingsDidUpdate {
+    [self updateTitleWithModel];
 }
 
 #pragma mark - Custom URL Scheme Action Handlers

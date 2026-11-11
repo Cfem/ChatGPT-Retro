@@ -9,8 +9,6 @@ static NSString *const kGeminiOAuthClientSecretKey = @"google_oauth_client_secre
 static NSString *const kGeminiOAuthAccessTokenKey = @"GeminiOAuthAccessToken";
 static NSString *const kGeminiOAuthRefreshTokenKey = @"GeminiOAuthRefreshToken";
 static NSString *const kGeminiOAuthEmailKey = @"GeminiOAuthEmail";
-static NSString *const kCustomPayloadTemplateKey = @"custom_request_payload";
-static NSString *const kCustomEndpointKey = @"custom_api_endpoint";
 static NSString *const kGoogleSearchEnabledKey = @"enable_google_search";
 static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
@@ -34,52 +32,55 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 - (instancetype)init {
     self = [super init];
     if (self) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        _apiKey = [defaults stringForKey:kGeminiApiKeyDefaultsKey] ?: @"";
+        _selectedModel = [defaults stringForKey:kGeminiModelDefaultsKey] ?: kDefaultModel;
+        _oauthClientId = [defaults stringForKey:kGeminiOAuthClientIdKey] ?: @"";
+        _oauthClientSecret = [defaults stringForKey:kGeminiOAuthClientSecretKey] ?: @"";
+        _oauthAccessToken = [defaults stringForKey:kGeminiOAuthAccessTokenKey] ?: @"";
+        _userEmail = [defaults stringForKey:kGeminiOAuthEmailKey] ?: @"";
+
+        if ([defaults objectForKey:kGoogleSearchEnabledKey] == nil) {
+            [defaults setBool:YES forKey:kGoogleSearchEnabledKey];
+            [defaults synchronize];
+        }
+
         NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
         config.timeoutIntervalForRequest = 60.0;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
         _session = [NSURLSession sessionWithConfiguration:config];
-        [self synchronizeSettings];
     }
     return self;
 }
 
-- (void)synchronizeSettings {
+- (void)saveOAuthClientId:(NSString *)clientId secret:(NSString *)secret {
+    _oauthClientId = [clientId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+    _oauthClientSecret = [secret stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+    
+    [[NSUserDefaults standardUserDefaults] setObject:_oauthClientId forKey:kGeminiOAuthClientIdKey];
+    [[NSUserDefaults standardUserDefaults] setObject:_oauthClientSecret forKey:kGeminiOAuthClientSecretKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-- (NSString *)apiKey {
-    [self synchronizeSettings];
-    NSString *val = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiApiKeyDefaultsKey];
-    return [val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+- (void)saveApiKey:(NSString *)apiKey {
+    _apiKey = [apiKey stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+    [[NSUserDefaults standardUserDefaults] setObject:_apiKey forKey:kGeminiApiKeyDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-- (NSString *)selectedModel {
-    [self synchronizeSettings];
-    NSString *m = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiModelDefaultsKey];
-    m = [m stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    return (m && m.length > 0) ? m : kDefaultModel;
+- (void)saveSelectedModel:(NSString *)model {
+    _selectedModel = [model stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: kDefaultModel;
+    [[NSUserDefaults standardUserDefaults] setObject:_selectedModel forKey:kGeminiModelDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-- (NSString *)oauthClientId {
-    [self synchronizeSettings];
-    NSString *val = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientIdKey];
-    return [val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
-}
-
-- (NSString *)oauthClientSecret {
-    [self synchronizeSettings];
-    NSString *val = [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthClientSecretKey];
-    return [val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
-}
-
-- (NSString *)oauthAccessToken {
-    [self synchronizeSettings];
-    return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthAccessTokenKey] ?: @"";
-}
-
-- (NSString *)userEmail {
-    [self synchronizeSettings];
-    return [[NSUserDefaults standardUserDefaults] stringForKey:kGeminiOAuthEmailKey] ?: @"";
+- (void)signOutGoogleAccount {
+    _oauthAccessToken = @"";
+    _userEmail = @"";
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthAccessTokenKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthRefreshTokenKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthEmailKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 - (BOOL)hasOAuthCredentials {
@@ -96,22 +97,12 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     return NO;
 }
 
-- (void)signOutGoogleAccount {
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthAccessTokenKey];
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthRefreshTokenKey];
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kGeminiOAuthEmailKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
 #pragma mark - OAuth Device Flow
 
 - (void)startDeviceAuthFlowWithCompletion:(GeminiDeviceAuthHandler)completion {
-    [self synchronizeSettings];
     if (![self hasOAuthCredentials]) {
         if (completion) {
-            NSString *msg = [NSString stringWithFormat:@"Client ID: (%lu karakter), Secret: (%lu karakter). Lütfen iPad Ayarlar uygulamasından çıkıp Gemini uygulamasını açın veya 'Ayarları & Modelleri Eşitle' butonunu açın.",
-                             (unsigned long)self.oauthClientId.length, (unsigned long)self.oauthClientSecret.length];
-            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: msg}];
+            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: @"Lütfen önce Client ID ve Client Secret alanlarını doldurup 'Ayarları Kaydet' butonuna basın."}];
             completion(nil, nil, nil, err);
         }
         return;
@@ -141,7 +132,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         NSString *deviceCode = json[@"device_code"];
 
         if (!userCode || !deviceCode) {
-            NSString *errMsg = json[@"error_description"] ?: @"Google Device Flow başlatılamadı.";
+            NSString *errMsg = json[@"error_description"] ?: @"Google Device Flow başlatılamadı. Client ID'nin doğru ve 'TVs and Limited Input devices' türünde olduğunu kontrol edin.";
             NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: errMsg}];
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (completion) completion(nil, nil, nil, err);
@@ -190,6 +181,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
         if (accessToken && accessToken.length > 0) {
             [timer invalidate];
+            self.oauthAccessToken = accessToken;
             [[NSUserDefaults standardUserDefaults] setObject:accessToken forKey:kGeminiOAuthAccessTokenKey];
             if (refreshToken) [[NSUserDefaults standardUserDefaults] setObject:refreshToken forKey:kGeminiOAuthRefreshTokenKey];
             [[NSUserDefaults standardUserDefaults] synchronize];
@@ -232,6 +224,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         if (data) {
             NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             if (json[@"email"]) {
+                self.userEmail = json[@"email"];
                 [[NSUserDefaults standardUserDefaults] setObject:json[@"email"] forKey:kGeminiOAuthEmailKey];
                 [[NSUserDefaults standardUserDefaults] synchronize];
             }
@@ -240,7 +233,6 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 }
 
 - (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion {
-    [self synchronizeSettings];
     if (![self isAuthenticated]) {
         if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" code:401 userInfo:@{NSLocalizedDescriptionKey: @"Lütfen önce API Key girin veya Google hesabınızı bağlayın."}];
@@ -299,19 +291,14 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [task resume];
 }
 
-- (NSString *)customRequestPayloadTemplate {
-    return [[NSUserDefaults standardUserDefaults] stringForKey:kCustomPayloadTemplateKey];
-}
-
 - (void)sendMessage:(NSString *)prompt 
             history:(NSArray *)historyMessages 
          completion:(GeminiCompletionHandler)completion {
-    [self synchronizeSettings];
     if (![self isAuthenticated]) {
         if (completion) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" 
                                                code:401 
-                                           userInfo:@{NSLocalizedDescriptionKey: @"Lütfen Ayarlar'dan API Key girin veya Google Hesabınızı bağlayın."}];
+                                           userInfo:@{NSLocalizedDescriptionKey: @"Lütfen sağ üstteki 'Ayarlar'dan Google Hesabınızı bağlayın veya API Key girin."}];
             completion(nil, err);
         }
         return;
@@ -322,9 +309,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         model = [model substringFromIndex:7];
     }
 
-    NSString *customBaseUrl = [[NSUserDefaults standardUserDefaults] stringForKey:kCustomEndpointKey];
-    NSString *baseUrl = (customBaseUrl && customBaseUrl.length > 5) ? customBaseUrl : @"https://generativelanguage.googleapis.com/v1beta";
-
+    NSString *baseUrl = @"https://generativelanguage.googleapis.com/v1beta";
     NSString *urlString;
     if (self.isGoogleAccountLinked) {
         urlString = [NSString stringWithFormat:@"%@/models/%@:generateContent", baseUrl, model];
@@ -384,18 +369,6 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     }
 
     NSData *bodyData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
-    
-    NSString *rawJson = [[NSString alloc] initWithData:bodyData encoding:NSUTF8StringEncoding];
-    [[NSUserDefaults standardUserDefaults] setObject:rawJson forKey:@"last_raw_request"];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-
-    NSString *customPayload = [self customRequestPayloadTemplate];
-    if (customPayload && customPayload.length > 10) {
-        NSString *filled = [customPayload stringByReplacingOccurrencesOfString:@"{PROMPT}" withString:prompt];
-        NSData *customData = [filled dataUsingEncoding:NSUTF8StringEncoding];
-        if (customData) bodyData = customData;
-    }
-
     [request setHTTPBody:bodyData];
 
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
