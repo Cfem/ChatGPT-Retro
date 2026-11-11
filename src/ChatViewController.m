@@ -2,7 +2,6 @@
 #import "ChatBubbleCell.h"
 #import "ChatMessage.h"
 #import "GeminiClient.h"
-#import "SettingsViewController.h"
 
 @interface ChatViewController ()
 
@@ -43,6 +42,12 @@
     [self setupInputBar];
     [self registerKeyboardNotifications];
 
+    // iOS Ayarlar uygulamasındaki değişiklikleri canlı dinle
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(userDefaultsDidChange:)
+                                                 name:NSUserDefaultsDidChangeNotification
+                                               object:nil];
+
     [self addWelcomeMessageIfNeeded];
 }
 
@@ -51,15 +56,15 @@
     [self updateTitleWithModel];
 }
 
+- (void)userDefaultsDidChange:(NSNotification *)note {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateTitleWithModel];
+    });
+}
+
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
-    if ([model containsString:@"flash-8b"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.8)";
-    } else if ([model containsString:@"pro"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.8)";
-    } else {
-        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.8)", model ?: @"Gemini 1.5 Flash"];
-    }
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.9)", model ?: @"gemini-1.5-flash"];
 }
 
 - (void)setupNavigationItems {
@@ -182,7 +187,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.8) üzerinde çalışıyorum.\n\nSağ üstteki 'Ayarlar'dan Google Hesabınızla veya API Anahtarıyla giriş yapabilirsiniz!";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.9) üzerinde çalışıyorum.\n\nAPI anahtarınızı veya model ayarlarınızı değiştirmek için iPad'inizin 'Ayarlar' (Settings.app) uygulamasını açıp 'Gemini' sayfasına gidebilirsiniz.";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -190,21 +195,17 @@
 }
 
 - (void)openSettingsTapped {
-    SettingsViewController *settingsVC = [[SettingsViewController alloc] init];
-    settingsVC.delegate = self;
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:settingsVC];
-    nav.modalPresentationStyle = UIModalPresentationFormSheet;
-    [self presentViewController:nav animated:YES completion:nil];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Uygulama Ayarları"
+                                                                   message:@"API anahtarınızı, model seçimini veya gelişmiş ayarları düzenlemek için iPad'inizin ana ekranındaki 'Ayarlar' (Settings) uygulamasını açıp sol menüden 'Gemini' sekmesine dokunun."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)clearChatTapped {
     [self.messages removeAllObjects];
     [self.tableView reloadData];
     [self addWelcomeMessageIfNeeded];
-}
-
-- (void)settingsDidUpdate {
-    [self updateTitleWithModel];
 }
 
 - (void)dismissKeyboard {
@@ -258,7 +259,7 @@
     } completion:nil];
 }
 
-#pragma mark - Messaging Logic (Full Response - Zero Freeze)
+#pragma mark - Messaging Logic
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
     [self sendButtonTapped];
@@ -274,7 +275,6 @@
         return;
     }
 
-    // 1. Kullanıcı mesajını listeye ekle
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
 
@@ -285,7 +285,6 @@
     [self setSendingState:YES];
     self.isSending = YES;
 
-    // 2. Yanıtı Google'dan komple bekle
     [[GeminiClient sharedClient] sendMessage:rawText 
                                      history:self.messages 
                                   completion:^(NSString *response, NSError *error) {
@@ -327,13 +326,10 @@
 }
 
 - (void)showApiKeyPrompt {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Giriş Gerekli"
-                                                                   message:@"Gemini ile konuşabilmek için Ayarlar'dan Google Hesabınızla giriş yapabilir veya API anahtarınızı tanımlayabilirsiniz."
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Anahtarı Gerekli"
+                                                                   message:@"Gemini ile konuşabilmek için iPad'inizin ana ekranındaki 'Ayarlar' (Settings) uygulamasını açıp 'Gemini' sayfasından API anahtarınızı girmeniz gerekmektedir."
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'a Git" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        [self openSettingsTapped];
-    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 
