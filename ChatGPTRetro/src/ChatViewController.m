@@ -48,6 +48,11 @@
                                                  name:NSUserDefaultsDidChangeNotification
                                                object:nil];
 
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(userDefaultsDidChange:)
+                                                 name:kChatGPTAuthStateDidChangeNotification
+                                               object:nil];
+
     [self addWelcomeMessageIfNeeded];
 }
 
@@ -64,8 +69,13 @@
 
 - (void)updateTitleWithModel {
     NSString *model = [OpenAIClient sharedClient].selectedModel;
-    NSString *authStatus = ([OpenAIClient sharedClient].apiKey.length > 10) ? @" [Hazır]" : @" [API Key Eksik]";
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.2)", model ?: @"gpt-4o-mini", authStatus];
+    NSString *authStatus = @" [Giriş Gerekli]";
+    if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
+        authStatus = @" [Using ChatGPT Plan]";
+    } else if ([OpenAIClient sharedClient].apiKey.length > 10) {
+        authStatus = @" [API Key Hazır]";
+    }
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.3)", model ?: @"gpt-4o-mini", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -336,9 +346,21 @@
 }
 
 - (void)showAuthPrompt {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Anahtarı Gerekli"
-                                                                   message:@"ChatGPT ile konuşabilmek için sağ üstteki 'Ayarlar' menüsünden OpenAI API Anahtarınızı (sk-...) giriniz."
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ChatGPT Girişi Gerekli"
+                                                                   message:@"ChatGPT ile konuşabilmek için ChatGPT Plus/Pro hesabınızla Safari üzerinden giriş yapabilir veya Ayarlar'dan OpenAI API Anahtarı girebilirsiniz."
                                                             preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Continue with ChatGPT (Safari)" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [[OpenAIClient sharedClient] startSignInWithChatGPTInSafariWithCompletion:^(BOOL success, NSError *error) {
+            [self updateTitleWithModel];
+            if (!success && error) {
+                UIAlertController *errAlert = [UIAlertController alertControllerWithTitle:@"Giriş Hatası"
+                                                                                  message:error.localizedDescription
+                                                                           preferredStyle:UIAlertControllerStyleAlert];
+                [errAlert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
+                [self presentViewController:errAlert animated:YES completion:nil];
+            }
+        }];
+    }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'ı Aç" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [self openSettingsTapped];
     }]];
