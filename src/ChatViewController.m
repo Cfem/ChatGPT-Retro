@@ -196,7 +196,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.6) üzerinde çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonuna dokunup ücretsiz Gemini API Anahtarınızı yapıştırabilir veya kamerayla QR koddan okutabilirsiniz!";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.6) üzerinde çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonuna dokunup ücretsiz Gemini API Anahtarınızı yapıştırabilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -322,7 +322,7 @@
 
 - (void)showAuthPrompt {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Anahtarı Gerekli"
-                                                                   message:@"Gemini ile konuşabilmek için sağ üstteki 'Ayarlar' menüsünden ücretsiz Gemini API Anahtarınızı girebilir veya kamerayla QR koddan okutabilirsiniz."
+                                                                   message:@"Gemini ile konuşabilmek için sağ üstteki 'Ayarlar' menüsünden ücretsiz Gemini API Anahtarınızı girebilirsiniz."
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'ı Aç" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [self openSettingsTapped];
