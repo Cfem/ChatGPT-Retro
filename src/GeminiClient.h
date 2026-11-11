@@ -7,19 +7,23 @@ typedef void (^GeminiTokenPollHandler)(BOOL success, NSError *error);
 
 @interface GeminiClient : NSObject
 
-@property (nonatomic, readonly) NSString *apiKey;
-@property (nonatomic, readonly) NSString *selectedModel;
-@property (nonatomic, readonly) NSString *oauthAccessToken;
-@property (nonatomic, readonly) NSString *oauthClientId;
-@property (nonatomic, readonly) NSString *oauthClientSecret;
-@property (nonatomic, readonly) NSString *userEmail;
+@property (nonatomic, copy) NSString *apiKey;
+@property (nonatomic, copy) NSString *selectedModel;
+@property (nonatomic, copy) NSString *oauthClientId;
+@property (nonatomic, copy) NSString *oauthClientSecret;
+@property (nonatomic, copy) NSString *oauthAccessToken;
+@property (nonatomic, copy) NSString *userEmail;
 
 + (instancetype)sharedClient;
+
+- (void)saveOAuthClientId:(NSString *)clientId secret:(NSString *)secret;
+- (void)saveApiKey:(NSString *)apiKey;
+- (void)saveSelectedModel:(NSString *)model;
+- (void)signOutGoogleAccount;
 
 - (BOOL)isAuthenticated;
 - (BOOL)hasOAuthCredentials;
 - (BOOL)isGoogleAccountLinked;
-- (void)signOutGoogleAccount;
 
 - (void)startDeviceAuthFlowWithCompletion:(GeminiDeviceAuthHandler)completion;
 - (void)pollDeviceTokenWithDeviceCode:(NSString *)deviceCode 
@@ -27,7 +31,6 @@ typedef void (^GeminiTokenPollHandler)(BOOL success, NSError *error);
                            completion:(GeminiTokenPollHandler)completion;
 
 - (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion;
-- (NSString *)customRequestPayloadTemplate;
 
 - (void)sendMessage:(NSString *)prompt 
             history:(NSArray *)historyMessages 
