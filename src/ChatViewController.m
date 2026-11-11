@@ -17,6 +17,10 @@
 
 @property (nonatomic, assign) CGFloat keyboardHeight;
 
+// Canlı akış sırasında tabloyu A5 CPU'yu yormadan aralıklarla güncelleme zamanlayıcısı
+@property (nonatomic, strong) NSTimer *streamUpdateTimer;
+@property (nonatomic, assign) BOOL isStreaming;
+
 @end
 
 @implementation ChatViewController
@@ -33,7 +37,6 @@
     [self setupInputBar];
     [self registerKeyboardNotifications];
 
-    // Karşılama mesajı
     [self addWelcomeMessageIfNeeded];
 }
 
@@ -45,11 +48,11 @@
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
     if ([model containsString:@"flash-8b"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (Light)";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash-8B (v1.4)";
     } else if ([model containsString:@"pro"]) {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro";
+        self.navigationItem.prompt = @"Model: Gemini 1.5 Pro (v1.4)";
     } else {
-        self.navigationItem.prompt = @"Model: Gemini 1.5 Flash";
+        self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@ (v1.4)", model ?: @"Gemini 1.5 Flash"];
     }
 }
 
@@ -92,13 +95,11 @@
     _inputContainerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
     _inputContainerView.backgroundColor = [UIColor colorWithWhite:0.98 alpha:0.95];
 
-    // İnce üst çizgi (iOS 8 single pixel separator)
     UIView *topLine = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 0.5)];
     topLine.backgroundColor = [UIColor colorWithWhite:0.75 alpha:1.0];
     topLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_inputContainerView addSubview:topLine];
 
-    // Giriş kutusu (iOS 8 iMessage stili)
     _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(12, 8, w - 80, 34)];
     _inputTextField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _inputTextField.placeholder = @"Gemini'ye bir soru sor...";
@@ -113,7 +114,6 @@
     _inputTextField.returnKeyType = UIReturnKeySend;
     [_inputContainerView addSubview:_inputTextField];
 
-    // Gönder butonu
     _sendButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _sendButton.frame = CGRectMake(w - 62, 8, 52, 34);
     _sendButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -122,7 +122,6 @@
     [_sendButton addTarget:self action:@selector(sendButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     [_inputContainerView addSubview:_sendButton];
 
-    // Yükleniyor göstergesi
     _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     _activityIndicator.center = _sendButton.center;
     _activityIndicator.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
@@ -134,7 +133,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4) üzerinde çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonundan ücretsiz Google AI Studio API anahtarınızı tanımlayabilirsiniz.";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v1.4) üzerinde canlı akış ile çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonundan ücretsiz Google AI Studio API anahtarınızı tanımlayabilirsiniz.";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -145,7 +144,7 @@
     SettingsViewController *settingsVC = [[SettingsViewController alloc] init];
     settingsVC.delegate = self;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:settingsVC];
-    nav.modalPresentationStyle = UIModalPresentationFormSheet; // iPad uyumlu modal
+    nav.modalPresentationStyle = UIModalPresentationFormSheet;
     [self presentViewController:nav animated:YES completion:nil];
 }
 
@@ -210,7 +209,7 @@
     } completion:nil];
 }
 
-#pragma mark - Messaging Logic
+#pragma mark - Messaging Logic (Live SSE Streaming)
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
     [self sendButtonTapped];
@@ -219,7 +218,7 @@
 
 - (void)sendButtonTapped {
     NSString *rawText = [self.inputTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (rawText.length == 0) return;
+    if (rawText.length == 0 || self.isStreaming) return;
 
     if (![[GeminiClient sharedClient] hasApiKey]) {
         [self showApiKeyPrompt];
@@ -229,28 +228,58 @@
     // 1. Kullanıcı mesajını listeye ekle
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
+
+    // 2. Gemini için boş bir yanıt balonu hazırla (Canlı akış buraya yazılacak)
+    ChatMessage *geminiMsg = [ChatMessage messageWithText:@"..." sender:ChatMessageSenderGemini];
+    [self.messages addObject:geminiMsg];
+
     [self.tableView reloadData];
     [self scrollToBottomAnimated:YES];
 
     self.inputTextField.text = @"";
     [self setSendingState:YES];
+    self.isStreaming = YES;
 
-    // 2. Gemini API'ye gönder
-    [[GeminiClient sharedClient] sendMessage:rawText 
-                                     history:self.messages 
-                                  completion:^(NSString *response, NSError *error) {
-        [self setSendingState:NO];
-
-        if (error) {
-            [self showAlertWithTitle:@"İstek Hatası" message:error.localizedDescription];
+    // 3. Canlı akışı başlat (streamGenerateContent)
+    [[GeminiClient sharedClient] streamMessage:rawText 
+                                       history:self.messages 
+                                  chunkHandler:^(NSString *chunk, NSString *accumulatedText, BOOL isFinished, NSError *error) {
+        
+        if (error && accumulatedText.length == 0) {
+            [self setSendingState:NO];
+            self.isStreaming = NO;
+            geminiMsg.text = [NSString stringWithFormat:@"Hata: %@", error.localizedDescription];
+            geminiMsg.cachedHeight = 0;
+            [self.tableView reloadData];
             return;
         }
 
-        ChatMessage *geminiMsg = [ChatMessage messageWithText:response sender:ChatMessageSenderGemini];
-        [self.messages addObject:geminiMsg];
-        [self.tableView reloadData];
-        [self scrollToBottomAnimated:YES];
+        if (accumulatedText.length > 0) {
+            geminiMsg.text = accumulatedText;
+            geminiMsg.cachedHeight = 0; // Dinamik olarak yeniden hesapla
+        }
+
+        if (isFinished) {
+            [self setSendingState:NO];
+            self.isStreaming = NO;
+            [self.tableView reloadData];
+            [self scrollToBottomAnimated:YES];
+        } else {
+            // A5 çipini yormamak için her chunk geldiğinde görünür hücreyi güncelle
+            [self updateLastMessageCellAnimated:NO];
+        }
     }];
+}
+
+- (void)updateLastMessageCellAnimated:(BOOL)animated {
+    if (self.messages.count == 0) return;
+    NSIndexPath *lastPath = [NSIndexPath indexPathForRow:self.messages.count - 1 inSection:0];
+    
+    // Tabloyu tamamen yeniden çizmek yerine sadece son satırı yeniden yükle (RAM & CPU dostu)
+    [UIView performWithoutAnimation:^{
+        [self.tableView reloadRowsAtIndexPaths:@[lastPath] withRowAnimation:UITableViewRowAnimationNone];
+    }];
+    [self scrollToBottomAnimated:NO];
 }
 
 - (void)setSendingState:(BOOL)sending {
@@ -279,14 +308,6 @@
     [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'a Git" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [self openSettingsTapped];
     }]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)showAlertWithTitle:(NSString *)title message:(NSString *)msg {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
-                                                                   message:msg
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 

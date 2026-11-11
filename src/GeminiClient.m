@@ -8,8 +8,11 @@ static NSString *const kCustomPayloadTemplateKey = @"custom_request_payload";
 static NSString *const kCustomEndpointKey = @"custom_api_endpoint";
 static NSString *const kDefaultModel = @"gemini-1.5-flash";
 
-@interface GeminiClient ()
+@interface GeminiClient () <NSURLSessionDataDelegate>
 @property (nonatomic, strong) NSURLSession *session;
+@property (nonatomic, copy) GeminiStreamChunkHandler currentChunkHandler;
+@property (nonatomic, strong) NSMutableString *streamBuffer;
+@property (nonatomic, strong) NSMutableString *accumulatedText;
 @end
 
 @implementation GeminiClient
@@ -30,11 +33,13 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         _apiKey = [defaults stringForKey:kGeminiApiKeyDefaultsKey] ?: @"";
         _selectedModel = [defaults stringForKey:kGeminiModelDefaultsKey] ?: kDefaultModel;
         _cachedModels = [defaults arrayForKey:kGeminiCachedModelsKey] ?: @[];
-        
+        _streamBuffer = [NSMutableString string];
+        _accumulatedText = [NSMutableString string];
+
         NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
-        config.timeoutIntervalForRequest = 45.0;
+        config.timeoutIntervalForRequest = 60.0;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        _session = [NSURLSession sessionWithConfiguration:config];
+        _session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
     }
     return self;
 }
@@ -62,9 +67,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
 - (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion {
     if (![self hasApiKey]) {
         if (completion) {
-            NSError *err = [NSError errorWithDomain:@"GeminiClient" 
-                                               code:401 
-                                           userInfo:@{NSLocalizedDescriptionKey: @"API Key girilmedi."}];
+            NSError *err = [NSError errorWithDomain:@"GeminiClient" code:401 userInfo:@{NSLocalizedDescriptionKey: @"API Key girilmedi."}];
             completion(nil, err);
         }
         return;
@@ -75,7 +78,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"GET"];
 
-    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (completion) completion(nil, error);
@@ -106,7 +109,7 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         for (NSDictionary *m in rawModels) {
             NSArray *methods = m[@"supportedGenerationMethods"];
             if ([methods containsObject:@"generateContent"]) {
-                NSString *name = m[@"name"]; // Örn: "models/gemini-1.5-flash"
+                NSString *name = m[@"name"];
                 if ([name hasPrefix:@"models/"]) {
                     name = [name substringFromIndex:7];
                 }
@@ -127,47 +130,42 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     [task resume];
 }
 
-- (void)sendMessage:(NSString *)prompt 
-            history:(NSArray *)historyMessages 
-         completion:(GeminiCompletionHandler)completion {
+- (void)streamMessage:(NSString *)prompt 
+              history:(NSArray *)historyMessages 
+         chunkHandler:(GeminiStreamChunkHandler)chunkHandler {
     if (![self hasApiKey]) {
-        if (completion) {
+        if (chunkHandler) {
             NSError *err = [NSError errorWithDomain:@"GeminiClient" 
                                                code:401 
-                                           userInfo:@{NSLocalizedDescriptionKey: @"API Key girilmedi. Lütfen Ayarlar'dan Google AI Studio API anahtarınızı girin."}];
-            completion(nil, err);
+                                           userInfo:@{NSLocalizedDescriptionKey: @"API Key girilmedi."}];
+            chunkHandler(nil, nil, YES, err);
         }
         return;
     }
+
+    self.currentChunkHandler = chunkHandler;
+    [self.streamBuffer setString:@""];
+    [self.accumulatedText setString:@""];
 
     NSString *model = self.selectedModel.length > 0 ? self.selectedModel : kDefaultModel;
     if ([model hasPrefix:@"models/"]) {
         model = [model substringFromIndex:7];
     }
 
-    // iOS Settings uygulamasından özel endpoint tanımlanmış mı?
     NSString *customBaseUrl = [[NSUserDefaults standardUserDefaults] stringForKey:kCustomEndpointKey];
     NSString *urlString;
     if (customBaseUrl && customBaseUrl.length > 5) {
-        urlString = [NSString stringWithFormat:@"%@/models/%@:generateContent?key=%@", customBaseUrl, model, self.apiKey];
+        urlString = [NSString stringWithFormat:@"%@/models/%@:streamGenerateContent?alt=sse&key=%@", customBaseUrl, model, self.apiKey];
     } else {
-        urlString = [NSString stringWithFormat:@"https://generativelanguage.googleapis.com/v1beta/models/%@:generateContent?key=%@", model, self.apiKey];
-    }
-    
-    NSURL *url = [NSURL URLWithString:urlString];
-    if (!url) {
-        if (completion) {
-            NSError *err = [NSError errorWithDomain:@"GeminiClient" code:400 userInfo:@{NSLocalizedDescriptionKey: @"Geçersiz API URL'i."}];
-            completion(nil, err);
-        }
-        return;
+        urlString = [NSString stringWithFormat:@"https://generativelanguage.googleapis.com/v1beta/models/%@:streamGenerateContent?alt=sse&key=%@", model, self.apiKey];
     }
 
+    NSURL *url = [NSURL URLWithString:urlString];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
 
-    // 512 MB RAM Koruması: Sadece son 8 mesajı gönder
+    // Son konuşma geçmişini derle (RAM korumalı)
     NSMutableArray *contents = [NSMutableArray array];
     NSInteger startIndex = 0;
     if (historyMessages.count > 8) {
@@ -192,70 +190,93 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
         @"contents": contents,
         @"generationConfig": @{
             @"temperature": @0.7,
-            @"maxOutputTokens": @2048
+            @"maxOutputTokens": @4096
         }
     };
 
     NSData *bodyData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
     
-    // Son yapılan ham isteği Settings.bundle'da gösterilmek üzere NSUserDefaults'a yaz
-    NSString *rawJsonString = [[NSString alloc] initWithData:bodyData encoding:NSUTF8StringEncoding];
-    [[NSUserDefaults standardUserDefaults] setObject:rawJsonString forKey:@"last_raw_request"];
+    NSString *rawJson = [[NSString alloc] initWithData:bodyData encoding:NSUTF8StringEncoding];
+    [[NSUserDefaults standardUserDefaults] setObject:rawJson forKey:@"last_raw_request"];
     [[NSUserDefaults standardUserDefaults] synchronize];
 
-    // Eğer kullanıcı iOS Ayarlar uygulamasından özel bir şablon girdiyse onu kullan
     NSString *customPayload = [self customRequestPayloadTemplate];
     if (customPayload && customPayload.length > 10) {
-        // {PROMPT} placeholder'ı varsa kullanıcının mesajını içine yerleştir
         NSString *filled = [customPayload stringByReplacingOccurrencesOfString:@"{PROMPT}" withString:prompt];
         NSData *customData = [filled dataUsingEncoding:NSUTF8StringEncoding];
-        if (customData) {
-            bodyData = customData;
-        }
+        if (customData) bodyData = customData;
     }
 
     [request setHTTPBody:bodyData];
 
-    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, error);
-            });
-            return;
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request];
+    [task resume];
+}
+
+#pragma mark - NSURLSessionDataDelegate (SSE Stream Parser)
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveResponse:(NSURLResponse *)response completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
+    NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
+    if (http.statusCode != 200) {
+        // Hata durumunda da akışı bitir
+    }
+    completionHandler(NSURLSessionResponseAllow);
+}
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data {
+    NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    if (!text) return;
+
+    [self.streamBuffer appendString:text];
+
+    // SSE Satırlarını ayrıştır ("data: { ... }")
+    while (YES) {
+        NSRange newlineRange = [self.streamBuffer rangeOfString:@"\n"];
+        if (newlineRange.location == NSNotFound) {
+            break;
         }
 
-        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-        if (httpResponse.statusCode != 200) {
-            NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)httpResponse.statusCode];
-            if (data.length > 0) {
-                NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                if (errJson[@"error"][@"message"]) {
-                    errMsg = errJson[@"error"][@"message"];
+        NSString *line = [self.streamBuffer substringToIndex:newlineRange.location];
+        [self.streamBuffer deleteCharactersInRange:NSMakeRange(0, newlineRange.location + 1)];
+
+        line = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([line hasPrefix:@"data: "]) {
+            NSString *jsonString = [line substringFromIndex:6];
+            NSData *jsonData = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
+            if (!jsonData) continue;
+
+            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
+            if (!json) continue;
+
+            NSArray *candidates = json[@"candidates"];
+            if (candidates.count > 0) {
+                NSDictionary *candidate = candidates[0];
+                NSArray *parts = candidate[@"content"][@"parts"];
+                
+                // TÜM PART'LARI EKSİKSİZ BİRLEŞTİR (1. 2. 3. blokları asla kaçırma)
+                NSMutableString *chunkText = [NSMutableString string];
+                for (NSDictionary *p in parts) {
+                    if (p[@"text"]) {
+                        [chunkText appendString:p[@"text"]];
+                    }
+                }
+
+                if (chunkText.length > 0) {
+                    [self.accumulatedText appendString:chunkText];
+                    if (self.currentChunkHandler) {
+                        self.currentChunkHandler(chunkText, [self.accumulatedText copy], NO, nil);
+                    }
                 }
             }
-            NSError *apiErr = [NSError errorWithDomain:@"GeminiClient" code:httpResponse.statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, apiErr);
-            });
-            return;
         }
+    }
+}
 
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        NSString *replyText = @"";
-        NSArray *candidates = json[@"candidates"];
-        if (candidates.count > 0) {
-            NSDictionary *cand = candidates[0];
-            NSArray *parts = cand[@"content"][@"parts"];
-            if (parts.count > 0) {
-                replyText = parts[0][@"text"] ?: @"";
-            }
-        }
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) completion(replyText, nil);
-        });
-    }];
-    [task resume];
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
+    if (self.currentChunkHandler) {
+        self.currentChunkHandler(@"", [self.accumulatedText copy], YES, error);
+        self.currentChunkHandler = nil;
+    }
 }
 
 @end

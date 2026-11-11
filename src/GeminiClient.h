@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 
 typedef void (^GeminiCompletionHandler)(NSString *response, NSError *error);
+typedef void (^GeminiStreamChunkHandler)(NSString *chunk, NSString *accumulatedText, BOOL isFinished, NSError *error);
 typedef void (^GeminiModelsHandler)(NSArray *models, NSError *error);
 
 @interface GeminiClient : NSObject
@@ -15,14 +16,12 @@ typedef void (^GeminiModelsHandler)(NSArray *models, NSError *error);
 - (void)saveSelectedModel:(NSString *)model;
 - (BOOL)hasApiKey;
 
-// Canlı modelleri Google AI Studio'dan çeker (generateContent destekleyenleri filtreler)
 - (void)fetchAvailableModelsWithCompletion:(GeminiModelsHandler)completion;
-
-// Ham request şablonunu Settings.bundle / NSUserDefaults üzerinden okur veya günceller
 - (NSString *)customRequestPayloadTemplate;
 
-- (void)sendMessage:(NSString *)prompt 
-            history:(NSArray *)historyMessages 
-         completion:(GeminiCompletionHandler)completion;
+// SSE (Server-Sent Events) ile parça parça canlı akış yöntemi
+- (void)streamMessage:(NSString *)prompt 
+              history:(NSArray *)historyMessages 
+         chunkHandler:(GeminiStreamChunkHandler)chunkHandler;
 
 @end
