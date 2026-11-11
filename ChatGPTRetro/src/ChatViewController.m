@@ -56,7 +56,7 @@
 - (void)updateTitleWithModel {
     NSString *model = [OpenAIClient sharedClient].selectedModel;
     NSString *authStatus = ([OpenAIClient sharedClient].apiKey.length > 10) ? @" [Hazır]" : @" [API Key Eksik]";
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.0)", model ?: @"gpt-4o-mini", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.1)", model ?: @"gpt-4o-mini", authStatus];
 }
 
 - (void)setupNavigationItems {
