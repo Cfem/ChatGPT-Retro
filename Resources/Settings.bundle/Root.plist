@@ -10,9 +10,105 @@
             <key>Type</key>
             <string>PSGroupSpecifier</string>
             <key>Title</key>
+            <string>KİMLİK DOĞRULAMA (AUTHENTICATION)</string>
+            <key>FooterText</key>
+            <string>Google AI Studio API anahtarınızı aistudio.google.com adresinden alıp buraya yapıştırabilirsiniz.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Gemini API Key</string>
+            <key>Key</key>
+            <string>GeminiClientApiKey</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>GOOGLE OAUTH 2.0 (İSTEĞE BAĞLI)</string>
+            <key>FooterText</key>
+            <string>Google Cloud Console'dan 'TVs and Limited Input Devices' türünde oluşturduğunuz Client ID ve Secret'ı buraya girebilirsiniz.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>OAuth Client ID</string>
+            <key>Key</key>
+            <string>google_oauth_client_id</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>OAuth Secret</string>
+            <key>Key</key>
+            <string>google_oauth_client_secret</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <true/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>MODEL SEÇİMİ</string>
+            <key>FooterText</key>
+            <string>Kullanmak istediğiniz Gemini model adını yazabilirsiniz (Örn: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash).</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Model Adı</string>
+            <key>Key</key>
+            <string>GeminiClientModel</string>
+            <key>DefaultValue</key>
+            <string>gemini-1.5-flash</string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
             <string>GELİŞMİŞ API İSTEK AYARLARI</string>
             <key>FooterText</key>
-            <string>Özel JSON isteği şablonu belirleyebilirsiniz. {PROMPT} etiketi yazdığınız mesaj ile otomatik değiştirilir. Boş bırakırsanız standart optimize şablon kullanılır.</string>
+            <string>Özel JSON şablonu veya alternatif proxy/endpoint belirleyebilirsiniz.</string>
         </dict>
         <dict>
             <key>Type</key>
@@ -55,8 +151,6 @@
             <string>PSGroupSpecifier</string>
             <key>Title</key>
             <string>SON YAPILAN HAM İSTEK (SALT OKUNUR)</string>
-            <key>FooterText</key>
-            <string>Gemini API'ye gönderilen en son ham JSON paketi yukarıda kaydedilmiştir.</string>
         </dict>
         <dict>
             <key>Type</key>
