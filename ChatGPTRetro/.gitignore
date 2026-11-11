@@ -1,0 +1,21 @@
+# Build & Intermediate files
+.theos/
+obj/
+build/
+*.ipa
+*.deb
+*.o
+*.dylib
+
+# Local tools & SDKs (do not track heavy binaries in git)
+theos/
+sdks/
+toolchain/
+
+# macOS / OS files
+.DS_Store
+Thumbs.db
+
+# User credentials
+api_key.txt
+*.key
