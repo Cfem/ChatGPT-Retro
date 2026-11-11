@@ -106,7 +106,7 @@
 
     UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(20, self.view.bounds.size.height - 80, self.view.bounds.size.width - 40, 40)];
     hint.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleWidth;
-    hint.text = @"Giriş doğrulama kodunu içeren QR kodu çerçeveye tutun";
+    hint.text = @"API Anahtarınızı (AIza...) içeren QR kodu çerçeveye tutun";
     hint.textColor = [UIColor whiteColor];
     hint.textAlignment = NSTextAlignmentCenter;
     hint.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:14.0];

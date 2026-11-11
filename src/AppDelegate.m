@@ -1,6 +1,5 @@
 #import "AppDelegate.h"
 #import "ChatViewController.h"
-#import "GeminiClient.h"
 
 @interface AppDelegate ()
 @property (nonatomic, strong) ChatViewController *chatViewController;
@@ -20,26 +19,6 @@
     
     self.window.rootViewController = nav;
     [self.window makeKeyAndVisible];
-    return YES;
-}
-
-- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
-    if (!url) return NO;
-
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    NSString *host = [url.host lowercaseString];
-
-    if ([host isEqualToString:@"push-settings"]) {
-        [self.chatViewController handlePushSettingsAction];
-        return YES;
-    } else if ([host isEqualToString:@"start-oauth"]) {
-        [self.chatViewController startGoogleOAuthFlow];
-        return YES;
-    } else if ([host isEqualToString:@"update-models"]) {
-        [self.chatViewController refreshModelsAction];
-        return YES;
-    }
-
     return YES;
 }
 
