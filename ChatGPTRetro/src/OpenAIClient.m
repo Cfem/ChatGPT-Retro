@@ -1,12 +1,13 @@
 #import "OpenAIClient.h"
 #import "ChatMessage.h"
+#import <Security/Security.h>
 
 static NSString *const kOpenAIApiKeyDefaultsKey = @"OpenAIClientApiKey";
 static NSString *const kOpenAIModelDefaultsKey = @"OpenAIClientModel";
 static NSString *const kOpenAICachedModelsKey = @"OpenAIClientCachedModels";
 static NSString *const kDefaultModel = @"gpt-4o-mini";
 
-@interface OpenAIClient ()
+@interface OpenAIClient () <NSURLSessionDelegate>
 @property (nonatomic, strong) NSURLSession *session;
 @end
 
@@ -31,9 +32,34 @@ static NSString *const kDefaultModel = @"gpt-4o-mini";
         NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
         config.timeoutIntervalForRequest = 60.0;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        _session = [NSURLSession sessionWithConfiguration:config];
+        
+        // iOS 8.4 Legacy SSL/TLS handshake uyumluluğu için delegate kullanımı
+        _session = [NSURLSession sessionWithConfiguration:config 
+                                                 delegate:self 
+                                            delegateQueue:[NSOperationQueue mainQueue]];
     }
     return self;
+}
+
+#pragma mark - NSURLSessionDelegate (SSL / Server Trust Bypass for iOS 8.4)
+
+- (void)URLSession:(NSURLSession *)session 
+didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge 
+ completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler {
+
+    if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+        SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
+        NSString *host = challenge.protectionSpace.host;
+
+        // OpenAI ve ilgili endpoint'ler için iOS 8'in eski kök sertifika deposundan kaynaklanan
+        // SSL doğrulaması engelini aşmak üzere güveni kabul et:
+        if ([host containsString:@"openai.com"]) {
+            completionHandler(NSURLSessionAuthChallengeUseCredential, [NSURLCredential credentialForTrust:serverTrust]);
+            return;
+        }
+    }
+    
+    completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
 }
 
 - (void)saveApiKey:(NSString *)apiKey {

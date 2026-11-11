@@ -216,7 +216,7 @@
             cell.detailTextLabel.text = @"iPad Mini 1 (iOS 8.4)";
         } else {
             cell.textLabel.text = @"Sürüm";
-            cell.detailTextLabel.text = @"v1.0 (ChatGPT Retro Edition)";
+            cell.detailTextLabel.text = @"v1.1 (ChatGPT Retro Edition)";
         }
     }
 
