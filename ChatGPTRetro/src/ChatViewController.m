@@ -11,12 +11,14 @@
 
 // Giriş çubuğu bileşenleri
 @property (nonatomic, strong) UIView *inputContainerView;
+@property (nonatomic, strong) UIButton *webSearchButton;
 @property (nonatomic, strong) UITextField *inputTextField;
 @property (nonatomic, strong) UIButton *sendButton;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
 
 @property (nonatomic, assign) CGFloat keyboardHeight;
 @property (nonatomic, assign) BOOL isSending;
+@property (nonatomic, assign) BOOL isWebSearchActive;
 
 @end
 
@@ -28,6 +30,13 @@
     self.view.backgroundColor = [UIColor colorWithRed:0.96 green:0.96 blue:0.98 alpha:1.0];
 
     _messages = [NSMutableArray array];
+
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:@"enable_chatgpt_web_search"] == nil) {
+        _isWebSearchActive = YES;
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"enable_chatgpt_web_search"];
+    } else {
+        _isWebSearchActive = [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_chatgpt_web_search"];
+    }
 
     [self setupNavigationItems];
     [self setupTableView];
@@ -56,7 +65,7 @@
 - (void)updateTitleWithModel {
     NSString *model = [OpenAIClient sharedClient].selectedModel;
     NSString *authStatus = ([OpenAIClient sharedClient].apiKey.length > 10) ? @" [Hazır]" : @" [API Key Eksik]";
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.1)", model ?: @"gpt-4o-mini", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.2)", model ?: @"gpt-4o-mini", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -116,8 +125,21 @@
     topLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_inputContainerView addSubview:topLine];
 
+    // Web Arama Butonu (GeminiRetro stili)
+    _webSearchButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _webSearchButton.frame = CGRectMake(8, 7, 36, 36);
+    _webSearchButton.layer.cornerRadius = 18.0;
+    _webSearchButton.layer.masksToBounds = YES;
+    [_webSearchButton setTitle:@"🌐" forState:UIControlStateNormal];
+    _webSearchButton.titleLabel.font = [UIFont systemFontOfSize:19.0];
+    [_webSearchButton addTarget:self action:@selector(toggleWebSearch) forControlEvents:UIControlEventTouchUpInside];
+    [self updateWebSearchButtonAppearance];
+    [_inputContainerView addSubview:_webSearchButton];
+
     // Metin Kutusu
-    _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(14, 8, w - 88, 34)];
+    CGFloat textX = 50.0;
+    CGFloat textW = w - textX - 68.0;
+    _inputTextField = [[UITextField alloc] initWithFrame:CGRectMake(textX, 8, textW, 34)];
     _inputTextField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _inputTextField.placeholder = @"Mesajınızı yazın...";
     _inputTextField.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
@@ -127,9 +149,9 @@
     _inputTextField.delegate = self;
     [_inputContainerView addSubview:_inputTextField];
 
-    // Gönder Butonu (OpenAI Teal/Yeşil Renk)
+    // Gönder Butonu (OpenAI Yeşili)
     _sendButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _sendButton.frame = CGRectMake(w - 70, 8, 60, 34);
+    _sendButton.frame = CGRectMake(w - 66, 8, 58, 34);
     _sendButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
     [_sendButton setTitle:@"Gönder" forState:UIControlStateNormal];
     _sendButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:16.0];
@@ -147,10 +169,38 @@
     [self.view addSubview:_inputContainerView];
 }
 
+- (void)toggleWebSearch {
+    self.isWebSearchActive = !self.isWebSearchActive;
+    [[NSUserDefaults standardUserDefaults] setBool:self.isWebSearchActive forKey:@"enable_chatgpt_web_search"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+
+    [UIView animateWithDuration:0.2 animations:^{
+        [self updateWebSearchButtonAppearance];
+        self.webSearchButton.transform = CGAffineTransformMakeScale(1.15, 1.15);
+    } completion:^(BOOL finished) {
+        [UIView animateWithDuration:0.15 animations:^{
+            self.webSearchButton.transform = CGAffineTransformIdentity;
+        }];
+    }];
+}
+
+- (void)updateWebSearchButtonAppearance {
+    if (self.isWebSearchActive) {
+        // OpenAI Teal/Yeşil Aktif Ton
+        self.webSearchButton.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:0.18];
+        self.webSearchButton.layer.borderWidth = 1.5;
+        self.webSearchButton.layer.borderColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0].CGColor;
+    } else {
+        self.webSearchButton.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
+        self.webSearchButton.layer.borderWidth = 0.5;
+        self.webSearchButton.layer.borderColor = [UIColor colorWithWhite:0.8 alpha:1.0].CGColor;
+    }
+}
+
 - (void)addWelcomeMessageIfNeeded {
     NSString *welcome = @"👋 ChatGPT Retro'ya Hoş Geldiniz!\n\n"
-                        @"Bu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI ChatGPT modelleriyle doğrudan ve hızlı sohbet edebilmeniz için uyarlandı.\n\n"
-                        @"Başlamak için sağ üstteki 'Ayarlar' butonundan OpenAI API Anahtarınızı (sk-...) girebilirsiniz.";
+                        @"Bu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle (GPT-4o, GPT-6 Luna vb.) doğrudan sohbet etmeniz için uyarlandı.\n\n"
+                        @"🌐 Sol alttaki Web Arama butonuyla canlı güncel internet bilgilerini açıp kapatabilirsiniz.";
     [self.messages addObject:[ChatMessage messageWithText:welcome sender:ChatMessageSenderAssistant]];
     [self.tableView reloadData];
 }
@@ -246,6 +296,7 @@
 
     [[OpenAIClient sharedClient] sendMessage:rawText 
                                      history:self.messages 
+                                   webSearch:self.isWebSearchActive 
                                   completion:^(NSString *response, NSError *error) {
         
         [self setSendingState:NO];

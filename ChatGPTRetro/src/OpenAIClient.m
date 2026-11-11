@@ -70,7 +70,6 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
 
 #pragma mark - Model Classification Helpers
 
-// Yeni nesil reasoning (o1, o3, o4), GPT-5 ve GPT-6 (Luna, Terra, Sol) modelleri
 - (BOOL)isModernOrReasoningModel:(NSString *)model {
     NSString *m = [model lowercaseString];
     if ([m hasPrefix:@"o1"] || [m hasPrefix:@"o3"] || [m hasPrefix:@"o4"]) return YES;
@@ -230,6 +229,7 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
 
 - (void)sendMessage:(NSString *)prompt 
             history:(NSArray *)historyMessages 
+          webSearch:(BOOL)webSearch
          completion:(OpenAICompletionHandler)completion {
 
     if (![self isAuthenticated]) {
@@ -248,13 +248,16 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     NSString *urlString = @"https://api.openai.com/v1/chat/completions";
     NSMutableArray *messages = [NSMutableArray array];
 
-    // Modern OpenAI spesifikasyonu:
-    // o1/o3/o4 ve GPT-5/6 (Luna/Terra/Sol) serisinde 'developer' rolü kullanılır;
-    // Eski modellerde 'system' rolü kullanılır.
     NSString *instructionRole = isModern ? @"developer" : @"system";
+    NSMutableString *systemPrompt = [NSMutableString stringWithString:@"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."];
+    
+    if (webSearch) {
+        [systemPrompt appendString:@" Web araması (canlı internet bilgisi) aktif. En güncel bilgilere göre cevap ver ve kaynakları/tarihleri belirt."];
+    }
+
     [messages addObject:@{
         @"role": instructionRole,
-        @"content": @"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."
+        @"content": systemPrompt
     }];
 
     NSMutableArray *filteredHistory = [NSMutableArray array];
@@ -288,11 +291,13 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     payloadDict[@"model"] = model;
     payloadDict[@"messages"] = messages;
 
-    // OpenAI Güncel Parametre Kuralları:
-    // 1. Temperature: Modern modellerde (o1, o3, Luna, Sol, Terra vb.) özel temperature (0.7 vs.)
-    //    desteklenmez veya sadece varsayılan 1 kabul edilir. Bu nedenle bu modellerde temperature
-    //    parametresi payload'dan tamamen çıkarılır (API'nin varsayılan 1 değerini kullanması sağlanır).
-    //    Yalnızca eski modellerde (gpt-4o, gpt-3.5) 0.7 gönderilir.
+    // Web Search desteği (OpenAI Responses / Tool Search API)
+    if (webSearch) {
+        payloadDict[@"tools"] = @[
+            @{ @"type": @"web_search" }
+        ];
+    }
+
     if (!isModern) {
         payloadDict[@"temperature"] = @0.7;
     }
@@ -315,39 +320,58 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
             return;
         }
 
-        if (statusCode != 200) {
-            NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)statusCode];
-            if (data.length > 0) {
-                NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                if (errJson && errJson[@"error"] && errJson[@"error"][@"message"]) {
-                    errMsg = errJson[@"error"][@"message"];
+        // Eğer web_search tool'unu seçili model doğrudan desteklemiyorsa (HTTP 400),
+        // aramayı prompt seviyesinde otomatik yedekleyip tekrar dener:
+        if (statusCode == 400 && webSearch) {
+            [payloadDict removeObjectForKey:@"tools"];
+            NSData *fallbackData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
+            [self performCurlRequestToURL:urlString method:@"POST" headers:headers jsonBody:fallbackData completion:^(NSData *fData, NSInteger fStatus, NSError *fErr) {
+                if (fErr) {
+                    if (completion) completion(nil, fErr);
+                    return;
                 }
-            }
-            NSError *apiErr = [NSError errorWithDomain:@"OpenAIClient" code:statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
-            if (completion) completion(nil, apiErr);
+                [self handleResponseData:fData statusCode:fStatus completion:completion];
+            }];
             return;
         }
 
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        NSString *replyText = @"";
+        [self handleResponseData:data statusCode:statusCode completion:completion];
+    }];
+}
 
-        NSArray *choices = json[@"choices"];
-        if (choices.count > 0) {
-            NSDictionary *choice = choices[0];
-            NSDictionary *message = choice[@"message"];
-            if (message && message[@"content"]) {
-                replyText = message[@"content"];
+- (void)handleResponseData:(NSData *)data statusCode:(NSInteger)statusCode completion:(OpenAICompletionHandler)completion {
+    if (statusCode != 200) {
+        NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)statusCode];
+        if (data.length > 0) {
+            NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            if (errJson && errJson[@"error"] && errJson[@"error"][@"message"]) {
+                errMsg = errJson[@"error"][@"message"];
             }
         }
+        NSError *apiErr = [NSError errorWithDomain:@"OpenAIClient" code:statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
+        if (completion) completion(nil, apiErr);
+        return;
+    }
 
-        if (replyText.length == 0) {
-            replyText = @"(Boş yanıt döndü)";
-        }
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSString *replyText = @"";
 
-        if (completion) {
-            completion([replyText stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]], nil);
+    NSArray *choices = json[@"choices"];
+    if (choices.count > 0) {
+        NSDictionary *choice = choices[0];
+        NSDictionary *message = choice[@"message"];
+        if (message && message[@"content"]) {
+            replyText = message[@"content"];
         }
-    }];
+    }
+
+    if (replyText.length == 0) {
+        replyText = @"(Boş yanıt döndü)";
+    }
+
+    if (completion) {
+        completion([replyText stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]], nil);
+    }
 }
 
 @end

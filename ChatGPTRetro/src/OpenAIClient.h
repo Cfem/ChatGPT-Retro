@@ -19,6 +19,7 @@ typedef void (^OpenAIModelsHandler)(NSArray *models, NSError *error);
 
 - (void)sendMessage:(NSString *)prompt 
             history:(NSArray *)historyMessages 
+          webSearch:(BOOL)webSearch
          completion:(OpenAICompletionHandler)completion;
 
 @end

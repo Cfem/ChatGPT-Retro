@@ -144,26 +144,24 @@
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 4;
+    return 3;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 1;
     if (section == 1) return 2;
-    if (section == 2) return 1;
     return 2;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"OPENAI API ANAHTARI";
     if (section == 1) return @"CHATGPT MODELİ";
-    if (section == 2) return @"KAYDET";
     return @"SİSTEM BİLGİSİ";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0) return @"platform.openai.com/api-keys adresinden alacağınız API anahtarını (sk-...) buraya yapıştırabilirsiniz.";
-    if (section == 1) return @"Hızlı ve ekonomik yanıtlar için 'gpt-4o-mini' tavsiye edilir.";
+    if (section == 1) return @"Ekonomik ve hızlı kullanım için 'gpt-4o-mini' veya yeni 'luna' modellerini tercih edebilirsiniz. Değişiklikleri sağ üstteki 'Kaydet' butonu ile kaydedebilirsiniz.";
     return nil;
 }
 
@@ -205,10 +203,6 @@
                 cell.textLabel.textColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
             }
         }
-    } else if (indexPath.section == 2) {
-        cell.textLabel.text = @"📥 Ayarları Kaydet ve Uygula";
-        cell.textLabel.textColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
-        cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:16.0];
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         if (indexPath.row == 0) {
@@ -216,7 +210,7 @@
             cell.detailTextLabel.text = @"iPad Mini 1 (iOS 8.4)";
         } else {
             cell.textLabel.text = @"Sürüm";
-            cell.detailTextLabel.text = @"v1.1 (ChatGPT Retro Edition)";
+            cell.detailTextLabel.text = @"v1.2 (ChatGPT Retro)";
         }
     }
 
@@ -230,8 +224,6 @@
         if (!self.isFetchingModels) {
             [self refreshModelsAction];
         }
-    } else if (indexPath.section == 2 && indexPath.row == 0) {
-        [self saveSettingsAction];
     }
 }
 
