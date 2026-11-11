@@ -97,6 +97,99 @@ static NSString *const kDefaultModel = @"gemini-1.5-flash";
     return NO;
 }
 
+#pragma mark - Standard OAuth 2.0 (Gemini Scope & QR / OOB Flow)
+
+- (NSString *)standardOAuthAuthorizationURL {
+    NSString *cid = [self.oauthClientId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (cid.length == 0) return @"";
+
+    // Scope: Sadece Gemini modelleri ve profil
+    NSString *scope = @"https://www.googleapis.com/auth/generative-language email profile";
+    NSString *encodedScope = [scope stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+
+    // Standart Desktop / Out-Of-Band Redirect URI
+    NSString *redirectUri = @"http://localhost";
+    NSString *encodedRedirect = [redirectUri stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+
+    return [NSString stringWithFormat:@"https://accounts.google.com/o/oauth2/v2/auth?client_id=%@&redirect_uri=%@&response_type=code&scope=%@&prompt=consent&access_type=offline",
+            cid, encodedRedirect, encodedScope];
+}
+
+- (void)exchangeAuthCode:(NSString *)rawInput completion:(GeminiExchangeCodeHandler)completion {
+    if (!rawInput || rawInput.length == 0) {
+        if (completion) {
+            NSError *err = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: @"Doğrulama kodu boş olamaz."}];
+            completion(NO, err);
+        }
+        return;
+    }
+
+    NSString *code = [rawInput stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    // Eğer kullanıcı veya kamera URL'nin tamamını verdiyse içindeki code= kısmını ayıkla
+    if ([code containsString:@"code="]) {
+        NSRange range = [code rangeOfString:@"code="];
+        NSString *sub = [code substringFromIndex:range.location + range.length];
+        NSRange ampRange = [sub rangeOfString:@"&"];
+        if (ampRange.location != NSNotFound) {
+            code = [sub substringToIndex:ampRange.location];
+        } else {
+            code = sub;
+        }
+    }
+    code = [code stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+
+    NSURL *tokenUrl = [NSURL URLWithString:@"https://oauth2.googleapis.com/token"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:tokenUrl];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+
+    NSString *redirectUri = @"http://localhost";
+    NSString *bodyStr;
+    if (self.oauthClientSecret.length > 0) {
+        bodyStr = [NSString stringWithFormat:@"client_id=%@&client_secret=%@&code=%@&grant_type=authorization_code&redirect_uri=%@",
+                   self.oauthClientId, self.oauthClientSecret, [code stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding], [redirectUri stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+    } else {
+        bodyStr = [NSString stringWithFormat:@"client_id=%@&code=%@&grant_type=authorization_code&redirect_uri=%@",
+                   self.oauthClientId, [code stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding], [redirectUri stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+    }
+    [request setHTTPBody:[bodyStr dataUsingEncoding:NSUTF8StringEncoding]];
+
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(NO, error);
+            });
+            return;
+        }
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSString *accessToken = json[@"access_token"];
+        NSString *refreshToken = json[@"refresh_token"];
+
+        if (accessToken && accessToken.length > 0) {
+            self.oauthAccessToken = accessToken;
+            [[NSUserDefaults standardUserDefaults] setObject:accessToken forKey:kGeminiOAuthAccessTokenKey];
+            if (refreshToken) [[NSUserDefaults standardUserDefaults] setObject:refreshToken forKey:kGeminiOAuthRefreshTokenKey];
+            [[NSUserDefaults standardUserDefaults] synchronize];
+
+            [self fetchUserEmail:accessToken];
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(YES, nil);
+            });
+            return;
+        }
+
+        NSString *desc = json[@"error_description"] ?: json[@"error"] ?: @"Doğrulama kodu Google tarafından onaylanamadı. Kodun süresi dolmuş veya hatalı olabilir.";
+        NSError *failErr = [NSError errorWithDomain:@"GeminiOAuth" code:400 userInfo:@{NSLocalizedDescriptionKey: desc}];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(NO, failErr);
+        });
+    }];
+    [task resume];
+}
+
 #pragma mark - OAuth Device Flow
 
 - (void)startDeviceAuthFlowWithCompletion:(GeminiDeviceAuthHandler)completion {
