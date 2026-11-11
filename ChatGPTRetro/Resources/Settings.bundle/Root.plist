@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>StringsTable</key>
+    <string>Root</string>
+    <key>PreferenceSpecifiers</key>
+    <array>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>OpenAI API Yapılandırması</string>
+            <key>FooterText</key>
+            <string>platform.openai.com/api-keys adresinden edindiğiniz API anahtarını buraya girin.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>API Anahtarı</string>
+            <key>Key</key>
+            <string>OpenAIClientApiKey</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <true/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Model</string>
+            <key>Key</key>
+            <string>OpenAIClientModel</string>
+            <key>DefaultValue</key>
+            <string>gpt-4o-mini</string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>Uygulama Bilgisi</string>
+            <key>FooterText</key>
+            <string>ChatGPT Retro v1.0 • iPad Mini 1 (iOS 8.4) Uyumlu</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTitleValueSpecifier</string>
+            <key>Title</key>
+            <string>Sürüm</string>
+            <key>Key</key>
+            <string>app_version_display</string>
+            <key>DefaultValue</key>
+            <string>1.0 (ChatGPT Retro)</string>
+        </dict>
+    </array>
+</dict>
+</plist>
