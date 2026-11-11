@@ -1,17 +1,36 @@
 #import "OpenAIClient.h"
 #import "ChatMessage.h"
-#import <Security/Security.h>
+#include <curl/curl.h>
 
 static NSString *const kOpenAIApiKeyDefaultsKey = @"OpenAIClientApiKey";
 static NSString *const kOpenAIModelDefaultsKey = @"OpenAIClientModel";
 static NSString *const kOpenAICachedModelsKey = @"OpenAIClientCachedModels";
 static NSString *const kDefaultModel = @"gpt-4o-mini";
 
-@interface OpenAIClient () <NSURLSessionDelegate>
-@property (nonatomic, strong) NSURLSession *session;
-@end
+struct CurlMemoryStruct {
+    char *memory;
+    size_t size;
+};
+
+static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t realsize = size * nmemb;
+    struct CurlMemoryStruct *mem = (struct CurlMemoryStruct *)userp;
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if (!ptr) return 0;
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+    return realsize;
+}
 
 @implementation OpenAIClient
+
++ (void)initialize {
+    if (self == [OpenAIClient class]) {
+        curl_global_init(CURL_GLOBAL_ALL);
+    }
+}
 
 + (instancetype)sharedClient {
     static OpenAIClient *shared = nil;
@@ -28,38 +47,8 @@ static NSString *const kDefaultModel = @"gpt-4o-mini";
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
         _apiKey = [defaults stringForKey:kOpenAIApiKeyDefaultsKey] ?: @"";
         _selectedModel = [defaults stringForKey:kOpenAIModelDefaultsKey] ?: kDefaultModel;
-
-        NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
-        config.timeoutIntervalForRequest = 60.0;
-        config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        
-        // iOS 8.4 Legacy SSL/TLS handshake uyumluluğu için delegate kullanımı
-        _session = [NSURLSession sessionWithConfiguration:config 
-                                                 delegate:self 
-                                            delegateQueue:[NSOperationQueue mainQueue]];
     }
     return self;
-}
-
-#pragma mark - NSURLSessionDelegate (SSL / Server Trust Bypass for iOS 8.4)
-
-- (void)URLSession:(NSURLSession *)session 
-didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge 
- completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler {
-
-    if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
-        SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
-        NSString *host = challenge.protectionSpace.host;
-
-        // OpenAI ve ilgili endpoint'ler için iOS 8'in eski kök sertifika deposundan kaynaklanan
-        // SSL doğrulaması engelini aşmak üzere güveni kabul et:
-        if ([host containsString:@"openai.com"]) {
-            completionHandler(NSURLSessionAuthChallengeUseCredential, [NSURLCredential credentialForTrust:serverTrust]);
-            return;
-        }
-    }
-    
-    completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
 }
 
 - (void)saveApiKey:(NSString *)apiKey {
@@ -79,6 +68,95 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
     return (self.apiKey.length > 10);
 }
 
+#pragma mark - cURL Request Engine (Bypasses iOS 8 SSL/TLS Handshake Limitations)
+
+- (void)performCurlRequestToURL:(NSString *)urlString 
+                         method:(NSString *)method 
+                        headers:(NSDictionary *)headers 
+                       jsonBody:(NSData *)bodyData 
+                     completion:(void (^)(NSData *data, NSInteger statusCode, NSError *error))completion {
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        CURL *curl = curl_easy_init();
+        if (!curl) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) {
+                    NSError *err = [NSError errorWithDomain:@"OpenAIClient" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"cURL başlatılamadı."}];
+                    completion(nil, 0, err);
+                }
+            });
+            return;
+        }
+
+        struct CurlMemoryStruct chunk;
+        chunk.memory = malloc(1);
+        chunk.size = 0;
+
+        struct curl_slist *headerList = NULL;
+        for (NSString *key in headers) {
+            NSString *val = headers[key];
+            NSString *combined = [NSString stringWithFormat:@"%@: %@", key, val];
+            headerList = curl_slist_append(headerList, [combined UTF8String]);
+        }
+
+        curl_easy_setopt(curl, CURLOPT_URL, [urlString UTF8String]);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerList);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 20L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+        // Modern OpenAI Cloudflare SSL Handshake Fix:
+        // iOS 8'in eski root cert deposuna takılmamak için verify peer kapatılır,
+        // gömülü modern OpenSSL şifreleyicisi bağlantıyı doğrudan TLS üzerinden yürütür.
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
+        if ([method isEqualToString:@"POST"]) {
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+            if (bodyData && bodyData.length > 0) {
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, [bodyData bytes]);
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)[bodyData length]);
+            }
+        } else {
+            curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+        }
+
+        CURLcode res = curl_easy_perform(curl);
+        long httpCode = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+
+        NSData *responseData = nil;
+        NSError *reqError = nil;
+
+        if (res == CURLE_OK) {
+            if (chunk.memory && chunk.size > 0) {
+                responseData = [NSData dataWithBytes:chunk.memory length:chunk.size];
+            }
+        } else {
+            const char *errStr = curl_easy_strerror(res);
+            NSString *errDesc = [NSString stringWithUTF8String:errStr] ?: @"Bilinmeyen ağ hatası";
+            reqError = [NSError errorWithDomain:@"OpenAIClient" code:res userInfo:@{NSLocalizedDescriptionKey: errDesc}];
+        }
+
+        if (chunk.memory) {
+            free(chunk.memory);
+        }
+        curl_slist_free_all(headerList);
+        curl_easy_cleanup(curl);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion(responseData, httpCode, reqError);
+            }
+        });
+    });
+}
+
+#pragma mark - Public Methods
+
 - (void)fetchAvailableModelsWithCompletion:(OpenAIModelsHandler)completion {
     if (![self isAuthenticated]) {
         if (completion) {
@@ -91,32 +169,31 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
     }
 
     NSString *urlString = @"https://api.openai.com/v1/models";
-    NSURL *url = [NSURL URLWithString:urlString];
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    [request setHTTPMethod:@"GET"];
-    [request setValue:[NSString stringWithFormat:@"Bearer %@", self.apiKey] forHTTPHeaderField:@"Authorization"];
+    NSDictionary *headers = @{
+        @"Authorization": [NSString stringWithFormat:@"Bearer %@", self.apiKey]
+    };
 
-    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+    [self performCurlRequestToURL:urlString 
+                           method:@"GET" 
+                          headers:headers 
+                         jsonBody:nil 
+                       completion:^(NSData *data, NSInteger statusCode, NSError *error) {
+        
         if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, error);
-            });
+            if (completion) completion(nil, error);
             return;
         }
 
-        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-        if (httpResponse.statusCode != 200) {
-            NSString *errMsg = [NSString stringWithFormat:@"HTTP %ld: API Anahtarınızı kontrol edin.", (long)httpResponse.statusCode];
+        if (statusCode != 200) {
+            NSString *errMsg = [NSString stringWithFormat:@"HTTP %ld: API Anahtarınızı kontrol edin.", (long)statusCode];
             if (data.length > 0) {
                 NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
                 if (errJson && errJson[@"error"] && errJson[@"error"][@"message"]) {
                     errMsg = errJson[@"error"][@"message"];
                 }
             }
-            NSError *apiErr = [NSError errorWithDomain:@"OpenAIClient" code:httpResponse.statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, apiErr);
-            });
+            NSError *apiErr = [NSError errorWithDomain:@"OpenAIClient" code:statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
+            if (completion) completion(nil, apiErr);
             return;
         }
 
@@ -138,11 +215,8 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
             [[NSUserDefaults standardUserDefaults] synchronize];
         }
 
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) completion(supported, nil);
-        });
+        if (completion) completion(supported, nil);
     }];
-    [task resume];
 }
 
 - (void)sendMessage:(NSString *)prompt 
@@ -160,15 +234,8 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
     }
 
     NSString *urlString = @"https://api.openai.com/v1/chat/completions";
-    NSURL *url = [NSURL URLWithString:urlString];
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    [request setHTTPMethod:@"POST"];
-    [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:[NSString stringWithFormat:@"Bearer %@", self.apiKey] forHTTPHeaderField:@"Authorization"];
-
     NSMutableArray *messages = [NSMutableArray array];
 
-    // System prompt
     [messages addObject:@{
         @"role": @"system",
         @"content": @"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."
@@ -206,35 +273,38 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
     payloadDict[@"model"] = model;
     payloadDict[@"messages"] = messages;
 
-    // Reasoning modelleri haricinde temperature ekleyebiliriz
     if (![model hasPrefix:@"o1"] && ![model hasPrefix:@"o3"]) {
         payloadDict[@"temperature"] = @0.7;
     }
 
     NSData *bodyData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
-    [request setHTTPBody:bodyData];
 
-    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+    NSDictionary *headers = @{
+        @"Content-Type": @"application/json; charset=utf-8",
+        @"Authorization": [NSString stringWithFormat:@"Bearer %@", self.apiKey]
+    };
+
+    [self performCurlRequestToURL:urlString 
+                           method:@"POST" 
+                          headers:headers 
+                         jsonBody:bodyData 
+                       completion:^(NSData *data, NSInteger statusCode, NSError *error) {
+        
         if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, error);
-            });
+            if (completion) completion(nil, error);
             return;
         }
 
-        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-        if (httpResponse.statusCode != 200) {
-            NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)httpResponse.statusCode];
+        if (statusCode != 200) {
+            NSString *errMsg = [NSString stringWithFormat:@"HTTP Hatası %ld", (long)statusCode];
             if (data.length > 0) {
                 NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
                 if (errJson && errJson[@"error"] && errJson[@"error"][@"message"]) {
                     errMsg = errJson[@"error"][@"message"];
                 }
             }
-            NSError *apiErr = [NSError errorWithDomain:@"OpenAIClient" code:httpResponse.statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, apiErr);
-            });
+            NSError *apiErr = [NSError errorWithDomain:@"OpenAIClient" code:statusCode userInfo:@{NSLocalizedDescriptionKey: errMsg}];
+            if (completion) completion(nil, apiErr);
             return;
         }
 
@@ -254,11 +324,10 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
             replyText = @"(Boş yanıt döndü)";
         }
 
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) completion([replyText stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]], nil);
-        });
+        if (completion) {
+            completion([replyText stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]], nil);
+        }
     }];
-    [task resume];
 }
 
 @end
