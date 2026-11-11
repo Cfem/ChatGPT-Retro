@@ -2,11 +2,12 @@
 #import "GeminiClient.h"
 
 @interface SettingsViewController ()
+@property (nonatomic, strong) UISegmentedControl *authModeSegment;
 @property (nonatomic, strong) UITextField *apiKeyTextField;
 @property (nonatomic, strong) NSMutableArray *models;
 @property (nonatomic, assign) NSInteger selectedModelIndex;
 @property (nonatomic, assign) BOOL isFetchingModels;
-@property (nonatomic, strong) UIActivityIndicatorView *fetchSpinner;
+@property (nonatomic, strong) UIAlertController *deviceAuthAlert;
 @end
 
 @implementation SettingsViewController
@@ -19,7 +20,6 @@
         if (cached && cached.count > 0) {
             [_models addObjectsFromArray:cached];
         } else {
-            // İlk açılışta temel varsayılanlar
             [_models addObjectsFromArray:@[@"gemini-1.5-flash", @"gemini-1.5-flash-8b", @"gemini-1.5-pro"]];
         }
     }
@@ -52,8 +52,11 @@
 - (void)saveButtonTapped {
     [self.view endEditing:YES];
     
-    NSString *key = self.apiKeyTextField.text;
-    [[GeminiClient sharedClient] saveApiKey:key];
+    [[GeminiClient sharedClient] saveAuthMode:(GeminiAuthMode)self.authModeSegment.selectedSegmentIndex];
+
+    if (self.apiKeyTextField.text) {
+        [[GeminiClient sharedClient] saveApiKey:self.apiKeyTextField.text];
+    }
     
     if (self.selectedModelIndex < self.models.count) {
         [[GeminiClient sharedClient] saveSelectedModel:self.models[self.selectedModelIndex]];
@@ -66,16 +69,78 @@
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
+- (void)authModeChanged:(UISegmentedControl *)sender {
+    [[GeminiClient sharedClient] saveAuthMode:(GeminiAuthMode)sender.selectedSegmentIndex];
+    [self.tableView reloadData];
+}
+
+- (void)startGoogleLogin {
+    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"Google Bağlantısı"
+                                                                     message:@"Cihaz kodu alınıyor, lütfen bekleyin..."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:loading animated:YES completion:nil];
+
+    [[GeminiClient sharedClient] startDeviceAuthFlowWithCompletion:^(NSString *userCode, NSString *verificationUrl, NSString *deviceCode, NSError *error) {
+        [loading dismissViewControllerAnimated:YES completion:^{
+            if (error) {
+                UIAlertController *errAlert = [UIAlertController alertControllerWithTitle:@"Bağlantı Hatası"
+                                                                                  message:error.localizedDescription
+                                                                           preferredStyle:UIAlertControllerStyleAlert];
+                [errAlert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
+                [self presentViewController:errAlert animated:YES completion:nil];
+                return;
+            }
+
+            // Kullanıcıya onay kodunu göster
+            NSString *msg = [NSString stringWithFormat:@"Telefonunuzdan veya bilgisayarınızdan şu adresi açın:\n\n%@\n\nVe bu kodu girin:\n👉 %@ 👈\n\nOnayladıktan sonra bu ekran otomatik güncellenecektir.",
+                             verificationUrl, userCode];
+
+            self.deviceAuthAlert = [UIAlertController alertControllerWithTitle:@"Google Hesabınızı Onaylayın"
+                                                                       message:msg
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+            [self.deviceAuthAlert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
+            [self presentViewController:self.deviceAuthAlert animated:YES completion:nil];
+
+            // Arka planda sorgulamayı başlat
+            [[GeminiClient sharedClient] pollDeviceTokenWithDeviceCode:deviceCode interval:5 completion:^(BOOL success, NSError *pollErr) {
+                [self.deviceAuthAlert dismissViewControllerAnimated:YES completion:^{
+                    if (success) {
+                        UIAlertController *ok = [UIAlertController alertControllerWithTitle:@"Giriş Başarılı!"
+                                                                                    message:@"Google hesabınız başarıyla bağlandı. Artık doğrudan hesabınızla sohbet edebilirsiniz."
+                                                                             preferredStyle:UIAlertControllerStyleAlert];
+                        [ok addAction:[UIAlertAction actionWithTitle:@"Harika" style:UIAlertActionStyleDefault handler:nil]];
+                        [self presentViewController:ok animated:YES completion:nil];
+                    } else if (pollErr) {
+                        UIAlertController *fail = [UIAlertController alertControllerWithTitle:@"Giriş Tamamlanamadı"
+                                                                                      message:pollErr.localizedDescription
+                                                                               preferredStyle:UIAlertControllerStyleAlert];
+                        [fail addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
+                        [self presentViewController:fail animated:YES completion:nil];
+                    }
+                    [self.tableView reloadData];
+                }];
+            }];
+        }];
+    }];
+}
+
+- (void)signOutGoogle {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Çıkış Yap"
+                                                                   message:@"Google hesabınızdan çıkış yapmak istediğinize emin misiniz?"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Çıkış Yap" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        [[GeminiClient sharedClient] signOutGoogleAccount];
+        [self.tableView reloadData];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)refreshModelsTapped {
     [self.view endEditing:YES];
-    NSString *currentKey = self.apiKeyTextField.text;
-    if (currentKey.length > 5) {
-        [[GeminiClient sharedClient] saveApiKey:currentKey];
-    }
-
-    if (![[GeminiClient sharedClient] hasApiKey]) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Key Gerekli" 
-                                                                       message:@"Modelleri çekebilmek için lütfen önce geçerli bir API Key girin." 
+    if (![[GeminiClient sharedClient] isAuthenticated]) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Giriş Gerekli" 
+                                                                       message:@"Modelleri çekebilmek için lütfen geçerli bir API Key girin veya Google hesabınızla giriş yapın." 
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
@@ -110,28 +175,37 @@
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 3;
+    return 4; // 0: Auth Mode, 1: Kimlik Detayı (Key/OAuth), 2: Modeller, 3: Sistem Bilgisi
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 1; // API Key
-    if (section == 1) return self.models.count + 1; // Modeller + "Refresh Models" Butonu
-    return 2; // Cihaz & iOS bilgisi
+    if (section == 0) return 1; // Segment
+    if (section == 1) {
+        if (self.authModeSegment.selectedSegmentIndex == GeminiAuthModeOAuth) {
+            return [[GeminiClient sharedClient] isAuthenticated] ? 2 : 1; // Durum + Çıkış Yap VEYA Giriş Yap
+        }
+        return 1; // API Key TextField
+    }
+    if (section == 2) return self.models.count + 1; // Modeller + Yenile Butonu
+    return 2; // Cihaz bilgisi
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"GOOGLE AI STUDIO API ANAHTARI";
-    if (section == 1) return @"GEMINI MODELLERİ (CANLI LİSTE)";
-    if (section == 2) return @"SİSTEM BİLGİSİ";
+    if (section == 0) return @"KİMLİK DOĞRULAMA YÖNTEMİ";
+    if (section == 1) {
+        return (self.authModeSegment.selectedSegmentIndex == GeminiAuthModeOAuth) ? @"GOOGLE HESABI (OAUTH 2.0)" : @"GOOGLE AI STUDIO API ANAHTARI";
+    }
+    if (section == 2) return @"GEMINI MODELLERİ (CANLI LİSTE)";
+    if (section == 3) return @"SİSTEM BİLGİSİ";
     return nil;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) {
-        return @"Ücretsiz API anahtarınızı aistudio.google.com adresinden alabilirsiniz.";
-    }
     if (section == 1) {
-        return @"'Modelleri Yenile' butonuna basarak Google API'nizdeki güncel modelleri canlı olarak listeleyebilirsiniz.";
+        if (self.authModeSegment.selectedSegmentIndex == GeminiAuthModeOAuth) {
+            return @"Google OAuth Device Flow ile bilgisayarınızdan veya telefonunuzdan google.com/device adresinde onaylayarak kolayca giriş yapabilirsiniz.";
+        }
+        return @"Ücretsiz API anahtarınızı aistudio.google.com adresinden alabilirsiniz.";
     }
     return nil;
 }
@@ -143,28 +217,55 @@
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:CellId];
     }
     cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.accessoryView = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     cell.textLabel.textColor = [UIColor blackColor];
     cell.detailTextLabel.text = nil;
 
     if (indexPath.section == 0) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        if (!self.apiKeyTextField) {
-            self.apiKeyTextField = [[UITextField alloc] initWithFrame:CGRectMake(16, 8, cell.contentView.bounds.size.width - 32, 28)];
-            self.apiKeyTextField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-            self.apiKeyTextField.placeholder = @"AIzaSy...";
-            self.apiKeyTextField.secureTextEntry = YES;
-            self.apiKeyTextField.clearButtonMode = UITextFieldViewModeWhileEditing;
-            self.apiKeyTextField.text = [GeminiClient sharedClient].apiKey;
-            self.apiKeyTextField.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
-            self.apiKeyTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
-            self.apiKeyTextField.autocorrectionType = UITextAutocorrectionTypeNo;
+        if (!self.authModeSegment) {
+            self.authModeSegment = [[UISegmentedControl alloc] initWithItems:@[@"API Anahtarı", @"Google Hesabı"]];
+            self.authModeSegment.frame = CGRectMake(16, 7, cell.contentView.bounds.size.width - 32, 30);
+            self.authModeSegment.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            self.authModeSegment.selectedSegmentIndex = [GeminiClient sharedClient].authMode;
+            [self.authModeSegment addTarget:self action:@selector(authModeChanged:) forControlEvents:UIControlEventValueChanged];
         }
-        [cell.contentView addSubview:self.apiKeyTextField];
+        [cell.contentView addSubview:self.authModeSegment];
         cell.textLabel.text = @"";
     } else if (indexPath.section == 1) {
+        if (self.authModeSegment.selectedSegmentIndex == GeminiAuthModeOAuth) {
+            if ([[GeminiClient sharedClient] isAuthenticated]) {
+                if (indexPath.row == 0) {
+                    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+                    cell.textLabel.text = @"Bağlı Hesap";
+                    cell.detailTextLabel.text = [GeminiClient sharedClient].userEmail.length > 0 ? [GeminiClient sharedClient].userEmail : @"Giriş Yapıldı (Aktif)";
+                } else {
+                    cell.textLabel.text = @"Hesaptan Çıkış Yap";
+                    cell.textLabel.textColor = [UIColor redColor];
+                }
+            } else {
+                cell.textLabel.text = @"🔑 Google Hesabı ile Giriş Yap";
+                cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
+            }
+        } else {
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+            if (!self.apiKeyTextField) {
+                self.apiKeyTextField = [[UITextField alloc] initWithFrame:CGRectMake(16, 8, cell.contentView.bounds.size.width - 32, 28)];
+                self.apiKeyTextField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+                self.apiKeyTextField.placeholder = @"AIzaSy...";
+                self.apiKeyTextField.secureTextEntry = YES;
+                self.apiKeyTextField.clearButtonMode = UITextFieldViewModeWhileEditing;
+                self.apiKeyTextField.text = [GeminiClient sharedClient].apiKey;
+                self.apiKeyTextField.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
+                self.apiKeyTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                self.apiKeyTextField.autocorrectionType = UITextAutocorrectionTypeNo;
+            }
+            [cell.contentView addSubview:self.apiKeyTextField];
+            cell.textLabel.text = @"";
+        }
+    } else if (indexPath.section == 2) {
         if (indexPath.row == self.models.count) {
-            // "Modelleri Yenile" Buton Satırı
             if (self.isFetchingModels) {
                 cell.textLabel.text = @"Modeller alınıyor...";
                 cell.textLabel.textColor = [UIColor grayColor];
@@ -174,23 +275,21 @@
             } else {
                 cell.textLabel.text = @"🔄 Modelleri Yenile (Refresh Models)";
                 cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
-                cell.accessoryView = nil;
             }
         } else {
-            cell.accessoryView = nil;
             cell.textLabel.text = self.models[indexPath.row];
             if (indexPath.row == self.selectedModelIndex) {
                 cell.accessoryType = UITableViewCellAccessoryCheckmark;
             }
         }
-    } else if (indexPath.section == 2) {
+    } else if (indexPath.section == 3) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         if (indexPath.row == 0) {
             cell.textLabel.text = @"Hedef Cihaz";
             cell.detailTextLabel.text = @"iPad Mini 1 (iOS 8.4)";
         } else {
-            cell.textLabel.text = @"İşlemci / RAM";
-            cell.detailTextLabel.text = @"Apple A5 / 512 MB";
+            cell.textLabel.text = @"Geliştirici Sürümü";
+            cell.detailTextLabel.text = @"v1.8 (OAuth + API Key)";
         }
     }
 
@@ -199,14 +298,22 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section == 1) {
+    if (indexPath.section == 1 && self.authModeSegment.selectedSegmentIndex == GeminiAuthModeOAuth) {
+        if ([[GeminiClient sharedClient] isAuthenticated]) {
+            if (indexPath.row == 1) {
+                [self signOutGoogle];
+            }
+        } else {
+            [self startGoogleLogin];
+        }
+    } else if (indexPath.section == 2) {
         if (indexPath.row == self.models.count) {
             if (!self.isFetchingModels) {
                 [self refreshModelsTapped];
             }
         } else {
             self.selectedModelIndex = indexPath.row;
-            [tableView reloadSections:[NSIndexSet indexSetWithIndex:1] withRowAnimation:UITableViewRowAnimationNone];
+            [tableView reloadSections:[NSIndexSet indexSetWithIndex:2] withRowAnimation:UITableViewRowAnimationNone];
         }
     }
 }
