@@ -68,7 +68,18 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     return (self.apiKey.length > 10);
 }
 
-#pragma mark - cURL Request Engine (Bypasses iOS 8 SSL/TLS Handshake Limitations)
+#pragma mark - Model Classification Helpers
+
+// Yeni nesil reasoning (o1, o3, o4), GPT-5 ve GPT-6 (Luna, Terra, Sol) modelleri
+- (BOOL)isModernOrReasoningModel:(NSString *)model {
+    NSString *m = [model lowercaseString];
+    if ([m hasPrefix:@"o1"] || [m hasPrefix:@"o3"] || [m hasPrefix:@"o4"]) return YES;
+    if ([m containsString:@"luna"] || [m containsString:@"sol"] || [m containsString:@"terra"]) return YES;
+    if ([m hasPrefix:@"gpt-5"] || [m hasPrefix:@"gpt-6"]) return YES;
+    return NO;
+}
+
+#pragma mark - cURL Request Engine
 
 - (void)performCurlRequestToURL:(NSString *)urlString 
                          method:(NSString *)method 
@@ -108,9 +119,7 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 
-        // Modern OpenAI Cloudflare SSL Handshake Fix:
-        // iOS 8'in eski root cert deposuna takılmamak için verify peer kapatılır,
-        // gömülü modern OpenSSL şifreleyicisi bağlantıyı doğrudan TLS üzerinden yürütür.
+        // iOS 8.4 SSL/TLS el sıkışması uyumluluğu
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
@@ -203,7 +212,7 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
 
         for (NSDictionary *m in modelsData) {
             NSString *modelId = m[@"id"];
-            if ([modelId hasPrefix:@"gpt-"] || [modelId hasPrefix:@"o1"] || [modelId hasPrefix:@"o3"] || [modelId hasPrefix:@"chatgpt-"]) {
+            if ([modelId hasPrefix:@"gpt-"] || [modelId hasPrefix:@"o1"] || [modelId hasPrefix:@"o3"] || [modelId hasPrefix:@"o4"] || [modelId hasPrefix:@"chatgpt-"]) {
                 [supported addObject:modelId];
             }
         }
@@ -233,11 +242,18 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         return;
     }
 
+    NSString *model = (self.selectedModel.length > 0) ? self.selectedModel : kDefaultModel;
+    BOOL isModern = [self isModernOrReasoningModel:model];
+
     NSString *urlString = @"https://api.openai.com/v1/chat/completions";
     NSMutableArray *messages = [NSMutableArray array];
 
+    // Modern OpenAI spesifikasyonu:
+    // o1/o3/o4 ve GPT-5/6 (Luna/Terra/Sol) serisinde 'developer' rolü kullanılır;
+    // Eski modellerde 'system' rolü kullanılır.
+    NSString *instructionRole = isModern ? @"developer" : @"system";
     [messages addObject:@{
-        @"role": @"system",
+        @"role": instructionRole,
         @"content": @"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."
     }];
 
@@ -268,12 +284,16 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         @"content": prompt ?: @""
     }];
 
-    NSString *model = (self.selectedModel.length > 0) ? self.selectedModel : kDefaultModel;
     NSMutableDictionary *payloadDict = [NSMutableDictionary dictionary];
     payloadDict[@"model"] = model;
     payloadDict[@"messages"] = messages;
 
-    if (![model hasPrefix:@"o1"] && ![model hasPrefix:@"o3"]) {
+    // OpenAI Güncel Parametre Kuralları:
+    // 1. Temperature: Modern modellerde (o1, o3, Luna, Sol, Terra vb.) özel temperature (0.7 vs.)
+    //    desteklenmez veya sadece varsayılan 1 kabul edilir. Bu nedenle bu modellerde temperature
+    //    parametresi payload'dan tamamen çıkarılır (API'nin varsayılan 1 değerini kullanması sağlanır).
+    //    Yalnızca eski modellerde (gpt-4o, gpt-3.5) 0.7 gönderilir.
+    if (!isModern) {
         payloadDict[@"temperature"] = @0.7;
     }
 
