@@ -1,14 +1,11 @@
-#import "OAuthModalViewController.h"
 #import "SettingsViewController.h"
 #import "GeminiClient.h"
+#import "QRScannerViewController.h"
 
-@interface SettingsViewController () <OAuthModalDelegate>
+@interface SettingsViewController () <QRScannerDelegate>
 
-@property (nonatomic, strong) UITextField *clientIdField;
 @property (nonatomic, strong) UITextField *apiKeyField;
 @property (nonatomic, strong) UITextField *modelField;
-
-@property (nonatomic, strong) UIAlertController *deviceAuthAlert;
 @property (nonatomic, assign) BOOL isFetchingModels;
 
 @end
@@ -22,7 +19,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Ayarlar & İşlemler";
+    self.title = @"Ayarlar";
 
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Kapat"
                                                                              style:UIBarButtonItemStylePlain
@@ -38,20 +35,9 @@
 }
 
 - (void)setupFields {
-    // 1. Client ID
-    _clientIdField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _clientIdField.placeholder = @"Örn: 678744244381-...apps.googleusercontent.com";
-    _clientIdField.text = [GeminiClient sharedClient].oauthClientId;
-    _clientIdField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-    _clientIdField.autocapitalizationType = UITextAutocapitalizationTypeNone;
-    _clientIdField.autocorrectionType = UITextAutocorrectionTypeNo;
-    _clientIdField.clearButtonMode = UITextFieldViewModeWhileEditing;
-
-
-
-    // 3. API Key
+    // 1. API Key
     _apiKeyField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _apiKeyField.placeholder = @"AIzaSy...";
+    _apiKeyField.placeholder = @"AIzaSy... (Buraya yapıştırın veya kamerayla tarayın)";
     _apiKeyField.text = [GeminiClient sharedClient].apiKey;
     _apiKeyField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
     _apiKeyField.secureTextEntry = YES;
@@ -59,7 +45,7 @@
     _apiKeyField.autocorrectionType = UITextAutocorrectionTypeNo;
     _apiKeyField.clearButtonMode = UITextFieldViewModeWhileEditing;
 
-    // 4. Model
+    // 2. Model
     _modelField = [[UITextField alloc] initWithFrame:CGRectZero];
     _modelField.placeholder = @"gemini-1.5-flash";
     _modelField.text = [GeminiClient sharedClient].selectedModel;
@@ -74,16 +60,14 @@
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
-#pragma mark - BUTON 1: Ayarları Kaydet ve Uygula
+#pragma mark - Actions
 
 - (void)saveSettingsAction {
     [self.view endEditing:YES];
 
-    NSString *cid = self.clientIdField.text ?: @"";
-        NSString *key = self.apiKeyField.text ?: @"";
+    NSString *key = self.apiKeyField.text ?: @"";
     NSString *model = self.modelField.text ?: @"gemini-1.5-flash";
 
-    [[GeminiClient sharedClient] saveOAuthClientId:cid secret:@""];
     [[GeminiClient sharedClient] saveApiKey:key];
     [[GeminiClient sharedClient] saveSelectedModel:model];
 
@@ -91,8 +75,8 @@
         [self.delegate settingsDidUpdate];
     }
 
-    NSString *msg = [NSString stringWithFormat:@"Ayarlar başarıyla kaydedildi!\n\n• Client ID: %lu karakter\n• API Key: %lu karakter\n• Model: %@",
-                     (unsigned long)cid.length, (unsigned long)key.length, model];
+    NSString *msg = [NSString stringWithFormat:@"Ayarlar başarıyla kaydedildi!\n\n• API Anahtarı: %lu karakter\n• Seçili Model: %@",
+                     (unsigned long)key.length, model];
 
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Kaydedildi" message:msg preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -101,42 +85,24 @@
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-#pragma mark - BUTON 2: Google ile Giriş Yap (QR Kod / Kamera / Kod Doğrulama)
-
-- (void)startGoogleOAuthFlow {
+- (void)scanApiKeyQRAction {
     [self.view endEditing:YES];
-
-    NSString *cid = self.clientIdField.text ?: @"";
-        [[GeminiClient sharedClient] saveOAuthClientId:cid secret:@""];
-
-    if (cid.length == 0) {
-        [self showAlertWithTitle:@"Client ID Gerekli" 
-                         message:@"Lütfen yukarıdaki Client ID alanına Google Cloud Console'dan aldığınız Desktop/Web Client ID'yi yapıştırınız."];
-        return;
-    }
-
-    OAuthModalViewController *modal = [[OAuthModalViewController alloc] init];
-    modal.delegate = self;
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:modal];
+    QRScannerViewController *scanner = [[QRScannerViewController alloc] init];
+    scanner.delegate = self;
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:scanner];
     nav.modalPresentationStyle = UIModalPresentationFormSheet;
     [self presentViewController:nav animated:YES completion:nil];
 }
 
-- (void)oauthModalDidCompleteLogin {
-    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-        [self.delegate settingsDidUpdate];
-    }
-    [self.tableView reloadData];
-}
-
-#pragma mark - BUTON 3: Modelleri Canlı Güncelle (Refresh Models)
-
 - (void)refreshModelsAction {
     [self.view endEditing:YES];
 
+    NSString *currentKey = self.apiKeyField.text ?: @"";
+    [[GeminiClient sharedClient] saveApiKey:currentKey];
+
     if (![[GeminiClient sharedClient] isAuthenticated]) {
-        [self showAlertWithTitle:@"Giriş Gerekli" 
-                         message:@"Modelleri çekebilmek için lütfen geçerli bir API Key girin veya Google Hesabınızı bağlayın."];
+        [self showAlertWithTitle:@"API Anahtarı Gerekli" 
+                         message:@"Modelleri çekebilmek için lütfen önce yukarıdaki kutuya geçerli bir Gemini API Anahtarı girin veya QR kod ile okutun."];
         return;
     }
 
@@ -178,60 +144,48 @@
     }];
 }
 
-- (void)signOutAction {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Çıkış Yap"
-                                                                   message:@"Google hesabınızdan çıkış yapmak istediğinize emin misiniz?"
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Çıkış Yap" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        [[GeminiClient sharedClient] signOutGoogleAccount];
-        if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-            [self.delegate settingsDidUpdate];
-        }
-        [self.tableView reloadData];
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
 - (void)showAlertWithTitle:(NSString *)title message:(NSString *)msg {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 
+#pragma mark - QRScannerDelegate
+
+- (void)qrScannerDidScanCode:(NSString *)code {
+    NSString *trimmed = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    self.apiKeyField.text = trimmed;
+    [[GeminiClient sharedClient] saveApiKey:trimmed];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
+    [self showAlertWithTitle:@"API Anahtarı Okundu"
+                     message:@"API Anahtarınız QR koddan başarıyla alındı ve kaydedildi!"];
+}
+
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return [GeminiClient sharedClient].isGoogleAccountLinked ? 6 : 5;
+    return 4;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 2; // Client ID, Client Secret, [BUTON 2: Google ile Giriş Yap]
-    if (section == 1) return 1; // [BUTON 1: Ayarları Kaydet ve Uygula]
-    if (section == 2) return 2; // Model TextField, [BUTON 3: Modelleri Canlı Güncelle]
-    if (section == 3) return 1; // API Key TextField
-    if (section == 4) {
-        if ([GeminiClient sharedClient].isGoogleAccountLinked) {
-            return 2; // Bağlı hesap bilgisi, Çıkış Yap
-        } else {
-            return 2; // Sistem bilgisi (iPad Mini 1, v2.3)
-        }
-    }
+    if (section == 0) return 2; // API Key TextField, [Kamerayla QR Koddan API Key Oku]
+    if (section == 1) return 2; // Model TextField, [Modelleri Canlı Güncelle]
+    if (section == 2) return 1; // [Ayarları Kaydet ve Uygula]
     return 2; // Sistem bilgisi
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"GOOGLE OAUTH 2.0 (HESAP GİRİŞİ)";
-    if (section == 1) return @"AYARLARI UYGULA";
-    if (section == 2) return @"GEMINI MODELİ";
-    if (section == 3) return @"GOOGLE AI STUDIO API ANAHTARI";
-    if (section == 4 && [GeminiClient sharedClient].isGoogleAccountLinked) return @"BAĞLI GOOGLE HESABI";
+    if (section == 0) return @"GOOGLE AI STUDIO API ANAHTARI";
+    if (section == 1) return @"GEMINI MODELİ";
+    if (section == 2) return @"KAYDET";
     return @"SİSTEM BİLGİSİ";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 0) return @"Google Cloud Console'dan aldığınız iOS Client ID'yi girip aşağıdaki butona basarak QR kod veya kamera ile hızlıca bağlanabilirsiniz.";
-    if (section == 3) return @"OAuth yerine doğrudan API anahtarıyla kullanmak isterseniz anahtarınızı buraya yazabilirsiniz.";
+    if (section == 0) return @"aistudio.google.com/apikey adresinden ücretsiz alacağınız API anahtarını buraya yapıştırabilir veya bilgisayar/telefon ekranınızdan QR kod olarak okutabilirsiniz.";
+    if (section == 1) return @"Yüksek günlük ücretsiz kota (1.500 mesaj/gün) için 'gemini-1.5-flash' veya 'gemini-2.0-flash' modellerini tercih edin.";
     return nil;
 }
 
@@ -245,6 +199,7 @@
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.accessoryView = nil;
     cell.textLabel.textColor = [UIColor blackColor];
+    cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:16.0];
     cell.detailTextLabel.text = nil;
 
     CGFloat w = tableView.bounds.size.width;
@@ -252,27 +207,20 @@
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = @"Client ID";
-            self.clientIdField.frame = CGRectMake(110, 8, w - 126, 28);
-            [cell.contentView addSubview:self.clientIdField];
+            cell.textLabel.text = @"API Key";
+            self.apiKeyField.frame = CGRectMake(110, 8, w - 126, 28);
+            [cell.contentView addSubview:self.apiKeyField];
         } else {
-            // BUTON 2: Google ile Giriş Yap (QR Kod / Kamera)
-            cell.textLabel.text = @"🔑 Google ile Giriş Yap (QR Kod / Kamera)";
+            cell.textLabel.text = @"📷 Kamerayla QR Koddan API Anahtarı Oku";
             cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
         }
     } else if (indexPath.section == 1) {
-        // BUTON 1: Ayarları Kaydet ve Uygula
-        cell.textLabel.text = @"📥 Ayarları Kaydet ve Uygula";
-        cell.textLabel.textColor = [UIColor colorWithRed:0.1 green:0.6 blue:0.1 alpha:1.0];
-        cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:16.0];
-    } else if (indexPath.section == 2) {
         if (indexPath.row == 0) {
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
             cell.textLabel.text = @"Model";
             self.modelField.frame = CGRectMake(110, 8, w - 126, 28);
             [cell.contentView addSubview:self.modelField];
         } else {
-            // BUTON 3: Modelleri Canlı Güncelle
             if (self.isFetchingModels) {
                 cell.textLabel.text = @"Modeller taranıyor...";
                 cell.textLabel.textColor = [UIColor grayColor];
@@ -284,20 +232,10 @@
                 cell.textLabel.textColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0];
             }
         }
-    } else if (indexPath.section == 3) {
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        cell.textLabel.text = @"API Key";
-        self.apiKeyField.frame = CGRectMake(110, 8, w - 126, 28);
-        [cell.contentView addSubview:self.apiKeyField];
-    } else if (indexPath.section == 4 && [GeminiClient sharedClient].isGoogleAccountLinked) {
-        if (indexPath.row == 0) {
-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = @"E-Posta";
-            cell.detailTextLabel.text = [GeminiClient sharedClient].userEmail.length > 0 ? [GeminiClient sharedClient].userEmail : @"Giriş Yapıldı (Aktif)";
-        } else {
-            cell.textLabel.text = @"🔴 Hesaptan Çıkış Yap";
-            cell.textLabel.textColor = [UIColor redColor];
-        }
+    } else if (indexPath.section == 2) {
+        cell.textLabel.text = @"📥 Ayarları Kaydet ve Uygula";
+        cell.textLabel.textColor = [UIColor colorWithRed:0.1 green:0.6 blue:0.1 alpha:1.0];
+        cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:16.0];
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         if (indexPath.row == 0) {
@@ -305,7 +243,7 @@
             cell.detailTextLabel.text = @"iPad Mini 1 (iOS 8.4)";
         } else {
             cell.textLabel.text = @"Sürüm";
-            cell.detailTextLabel.text = @"v2.5 (QR & Camera OAuth)";
+            cell.detailTextLabel.text = @"v2.6 (Pure API Key Edition)";
         }
     }
 
@@ -316,19 +254,13 @@
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
     if (indexPath.section == 0 && indexPath.row == 1) {
-        // Buton 2: Google ile Giriş Yap
-        [self startGoogleOAuthFlow];
-    } else if (indexPath.section == 1 && indexPath.row == 0) {
-        // Buton 1: Ayarları Kaydet ve Uygula
-        [self saveSettingsAction];
-    } else if (indexPath.section == 2 && indexPath.row == 1) {
-        // Buton 3: Modelleri Canlı Güncelle
+        [self scanApiKeyQRAction];
+    } else if (indexPath.section == 1 && indexPath.row == 1) {
         if (!self.isFetchingModels) {
             [self refreshModelsAction];
         }
-    } else if (indexPath.section == 4 && [GeminiClient sharedClient].isGoogleAccountLinked && indexPath.row == 1) {
-        // Çıkış Yap
-        [self signOutAction];
+    } else if (indexPath.section == 2 && indexPath.row == 0) {
+        [self saveSettingsAction];
     }
 }
 

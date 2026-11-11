@@ -2,7 +2,6 @@
 #import "ChatBubbleCell.h"
 #import "ChatMessage.h"
 #import "GeminiClient.h"
-
 #import "SettingsViewController.h"
 
 @interface ChatViewController () <SettingsViewControllerDelegate>
@@ -20,7 +19,6 @@
 @property (nonatomic, assign) CGFloat keyboardHeight;
 @property (nonatomic, assign) BOOL isSending;
 @property (nonatomic, assign) BOOL isWebSearchActive;
-@property (nonatomic, strong) UIAlertController *deviceAuthAlert;
 
 @end
 
@@ -66,13 +64,8 @@
 
 - (void)updateTitleWithModel {
     NSString *model = [GeminiClient sharedClient].selectedModel;
-    NSString *authStatus = @"";
-    if ([GeminiClient sharedClient].isGoogleAccountLinked) {
-        authStatus = @" [Google Hesabı]";
-    } else if ([GeminiClient sharedClient].apiKey.length > 5) {
-        authStatus = @" [API Key]";
-    }
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.3)", model ?: @"gemini-1.5-flash", authStatus];
+    NSString *authStatus = ([GeminiClient sharedClient].apiKey.length > 5) ? @" [Hazır]" : @" [API Key Eksik]";
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v2.6)", model ?: @"gemini-1.5-flash", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -97,117 +90,6 @@
 
 - (void)settingsDidUpdate {
     [self updateTitleWithModel];
-}
-
-#pragma mark - Custom URL Scheme Action Handlers
-
-- (void)handlePushSettingsAction {
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    [self updateTitleWithModel];
-
-    NSString *msg = [NSString stringWithFormat:@"Ayarlar başarıyla uygulamaya aktarıldı!\n\n• Client ID: %lu karakter\n• Client Secret: %lu karakter\n• API Key: %lu karakter\n• Model: %@",
-                     (unsigned long)[GeminiClient sharedClient].oauthClientId.length,
-                     (unsigned long)[GeminiClient sharedClient].oauthClientSecret.length,
-                     (unsigned long)[GeminiClient sharedClient].apiKey.length,
-                     [GeminiClient sharedClient].selectedModel];
-
-    [self showAlertWithTitle:@"Ayarlar Kaydedildi" message:msg];
-}
-
-- (void)startGoogleOAuthFlow {
-    [[NSUserDefaults standardUserDefaults] synchronize];
-
-    if (![[GeminiClient sharedClient] hasOAuthCredentials]) {
-        NSString *msg = [NSString stringWithFormat:@"Client ID (%lu karakter) veya Secret (%lu karakter) eksik.\n\nLütfen iPad Ayarlar uygulamasından Client ID ve Secret'ı girip altındaki '📥 Ayarları Uygulamaya Kaydet / Aktar' butonuna dokunun.",
-                         (unsigned long)[GeminiClient sharedClient].oauthClientId.length,
-                         (unsigned long)[GeminiClient sharedClient].oauthClientSecret.length];
-        [self showAlertWithTitle:@"Client ID / Secret Eksik" message:msg];
-        return;
-    }
-
-    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"Google Bağlantısı"
-                                                                     message:@"Cihaz kodu alınıyor, lütfen bekleyin..."
-                                                              preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:loading animated:YES completion:nil];
-
-    [[GeminiClient sharedClient] startDeviceAuthFlowWithCompletion:^(NSString *userCode, NSString *verificationUrl, NSString *deviceCode, NSError *error) {
-        [loading dismissViewControllerAnimated:YES completion:^{
-            if (error) {
-                [self showAlertWithTitle:@"Bağlantı Hatası" message:error.localizedDescription];
-                return;
-            }
-
-            NSString *msg = [NSString stringWithFormat:@"Telefonunuzdan veya bilgisayarınızdan şu adresi açın:\n\n%@\n\nVe bu kodu girin:\n👉 %@ 👈\n\nOnayladıktan sonra bu ekran otomatik kapanacaktır.",
-                             verificationUrl, userCode];
-
-            self.deviceAuthAlert = [UIAlertController alertControllerWithTitle:@"Google Hesabınızı Onaylayın"
-                                                                       message:msg
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-            [self.deviceAuthAlert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-            [self presentViewController:self.deviceAuthAlert animated:YES completion:nil];
-
-            [[GeminiClient sharedClient] pollDeviceTokenWithDeviceCode:deviceCode interval:5 completion:^(BOOL success, NSError *pollErr) {
-                [self.deviceAuthAlert dismissViewControllerAnimated:YES completion:^{
-                    if (success) {
-                        [self updateTitleWithModel];
-                        [self showAlertWithTitle:@"Giriş Başarılı!" 
-                                         message:@"Google hesabınız başarıyla bağlandı. Artık kotasız ve doğrudan hesabınızla konuşabilirsiniz."];
-                    } else if (pollErr) {
-                        [self showAlertWithTitle:@"Giriş Tamamlanamadı" message:pollErr.localizedDescription];
-                    }
-                }];
-            }];
-        }];
-    }];
-}
-
-- (void)refreshModelsAction {
-    [[NSUserDefaults standardUserDefaults] synchronize];
-
-    if (![[GeminiClient sharedClient] isAuthenticated]) {
-        [self showAlertWithTitle:@"Giriş Gerekli" 
-                         message:@"Modelleri çekebilmek için lütfen geçerli bir API Key girin veya Google Hesabınızı bağlayın."];
-        return;
-    }
-
-    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"Modeller Alınıyor"
-                                                                     message:@"Google API'den canlı model listesi çekiliyor..."
-                                                              preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:loading animated:YES completion:nil];
-
-    [[GeminiClient sharedClient] fetchAvailableModelsWithCompletion:^(NSArray *models, NSError *error) {
-        [loading dismissViewControllerAnimated:YES completion:^{
-            if (error) {
-                [self showAlertWithTitle:@"Hata" message:error.localizedDescription];
-                return;
-            }
-
-            if (models.count == 0) {
-                [self showAlertWithTitle:@"Model Bulunamadı" message:@"Erişilebilir model listesi boş döndü."];
-                return;
-            }
-
-            UIAlertController *modelPicker = [UIAlertController alertControllerWithTitle:@"Model Seçin"
-                                                                                 message:@"Kullanmak istediğiniz modeli seçin:"
-                                                                          preferredStyle:UIAlertControllerStyleActionSheet];
-            for (NSString *m in models) {
-                [modelPicker addAction:[UIAlertAction actionWithTitle:m style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-                    [[NSUserDefaults standardUserDefaults] setObject:m forKey:@"GeminiClientModel"];
-                    [[NSUserDefaults standardUserDefaults] synchronize];
-                    [self updateTitleWithModel];
-                }]];
-            }
-            [modelPicker addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-            modelPicker.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItem;
-            [self presentViewController:modelPicker animated:YES completion:nil];
-        }];
-    }];
-}
-
-- (void)showAlertWithTitle:(NSString *)title message:(NSString *)msg {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)setupTableView {
@@ -314,7 +196,7 @@
 
 - (void)addWelcomeMessageIfNeeded {
     if (self.messages.count == 0) {
-        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.2) üzerinde çalışıyorum.\n\nİşlem yapmak için sağ üstteki 'İşlemler' butonunu veya iPad Ayarları'ndaki doğrudan butonları kullanabilirsiniz!";
+        NSString *welcomeText = @"Merhaba! Ben Gemini. iPad Mini 1 (iOS 8.4, v2.6) üzerinde çalışıyorum.\n\nBaşlamak için sağ üstteki 'Ayarlar' butonuna dokunup ücretsiz Gemini API Anahtarınızı yapıştırabilir veya kamerayla QR koddan okutabilirsiniz!";
         ChatMessage *welcome = [ChatMessage messageWithText:welcomeText sender:ChatMessageSenderGemini];
         [self.messages addObject:welcome];
         [self.tableView reloadData];
@@ -439,10 +321,13 @@
 }
 
 - (void)showAuthPrompt {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Giriş Gerekli"
-                                                                   message:@"Gemini ile konuşabilmek için sağ üstteki 'İşlemler' menüsünden Google Hesabınızı bağlayabilir veya iPad Ayarları'ndan API anahtarınızı girebilirsiniz."
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"API Anahtarı Gerekli"
+                                                                   message:@"Gemini ile konuşabilmek için sağ üstteki 'Ayarlar' menüsünden ücretsiz Gemini API Anahtarınızı girebilir veya kamerayla QR koddan okutabilirsiniz."
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'ı Aç" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self openSettingsTapped];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 
