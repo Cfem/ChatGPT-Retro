@@ -1,0 +1,10 @@
+.theos/
+.DS_Store
+*.ipa
+theos/
+GeminiRetro/
+GeminiRetroIPAs/
+deploy_to_ipad.sh
+install_and_run.sh
+Resources/
+packages/
