@@ -49,8 +49,9 @@ Legacy Mobile Safari on iOS 8 does not support modern web standards, modern TLS 
 
 ## Installation
 
-- **Jailbroken Devices:** If your device has `AppSync Unified` installed, transfer and install `ChatGPTRetro.ipa` directly using Filza, iFunBox, or Apple Configurator.
-- **Non-Jailbroken Devices:** Sideload `ChatGPTRetro.ipa` using tools such as Sideloadly or AltStore with your free Apple ID.
+- **Direct Web Install (On-Device):** Visit [https://cfem.github.io/ChatGPT-Retro](https://cfem.github.io/ChatGPT-Retro) directly on your legacy Safari browser and tap **Install on iDevice** (Requires a jailbroken device with `AppSync Unified`).
+- **Jailbroken Devices (Manual):** If your device has `AppSync Unified` installed, download `ChatGPTRetro.ipa` directly and install it via Filza, iFunBox, or 3uTools.
+- **Non-Jailbroken Devices:** Sideload `ChatGPTRetro.ipa` using tools such as Sideloadly or AltStore via PC/Mac with your free Apple ID.
 
 ---
 
