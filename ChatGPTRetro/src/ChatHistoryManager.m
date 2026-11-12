@@ -1,5 +1,6 @@
 #import "ChatHistoryManager.h"
 #import "ChatMessage.h"
+#import "LocalizationManager.h"
 
 static NSString *const kSavedSessionsKey = @"ChatGPTRetro_SavedChatSessions_v2";
 static const NSInteger kMaxSessionsCount = 10;
@@ -62,7 +63,7 @@ static const NSInteger kMaxSessionsCount = 10;
 }
 
 - (ChatSession *)createNewSession {
-    ChatSession *newSession = [ChatSession sessionWithTitle:@"Yeni Sohbet"];
+    ChatSession *newSession = [ChatSession sessionWithTitle:LocalizedString(@"new_chat_title")];
     [self.sessions insertObject:newSession atIndex:0];
     self.activeSession = newSession;
     [self saveSessions];
@@ -98,7 +99,9 @@ static const NSInteger kMaxSessionsCount = 10;
     self.activeSession.updatedAt = [NSDate date];
 
     // Eğer oturumun adı varsayılan ise, kullanıcının ilk mesajına göre akıllı başlık ver
-    if ([self.activeSession.title isEqualToString:@"Yeni Sohbet"] && text.length > 0) {
+    if (([self.activeSession.title isEqualToString:@"Yeni Sohbet"] || 
+         [self.activeSession.title isEqualToString:@"New Chat"] ||
+         [self.activeSession.title isEqualToString:LocalizedString(@"new_chat_title")]) && text.length > 0) {
         NSString *clean = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (clean.length > 28) {
             clean = [[clean substringToIndex:28] stringByAppendingString:@"…"];

@@ -12,6 +12,7 @@ typedef NS_ENUM(NSInteger, ChatMessageSender) {
 @property (nonatomic, assign) ChatMessageSender sender;
 @property (nonatomic, strong) NSDate *timestamp;
 @property (nonatomic, assign) CGFloat cachedHeight;
+@property (nonatomic, assign) BOOL isLoading;
 
 + (instancetype)messageWithText:(NSString *)text sender:(ChatMessageSender)sender;
 

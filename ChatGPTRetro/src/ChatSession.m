@@ -21,7 +21,7 @@
     }
     return @{
         @"sessionId": self.sessionId ?: @"",
-        @"title": self.title ?: @"Yeni Sohbet",
+        @"title": self.title ?: LocalizedString(@"new_chat_title"),
         @"updatedAt": @([self.updatedAt timeIntervalSince1970]),
         @"messages": msgDicts
     };

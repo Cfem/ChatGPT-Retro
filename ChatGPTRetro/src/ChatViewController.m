@@ -99,6 +99,15 @@
         [self updateTitleWithModel];
         self.inputTextField.placeholder = LocalizedString(@"input_placeholder");
         [self.sendButton setTitle:LocalizedString(@"send_button") forState:UIControlStateNormal];
+
+        ChatSession *active = [ChatHistoryManager sharedManager].activeSession;
+        if ([active.title isEqualToString:@"Yeni Sohbet"] || [active.title isEqualToString:@"New Chat"]) {
+            active.title = LocalizedString(@"new_chat_title");
+            self.title = LocalizedString(@"new_chat_title");
+        } else if (active.title.length > 0) {
+            self.title = active.title;
+        }
+
         [self.tableView reloadData];
     });
 }
@@ -641,8 +650,8 @@
         ChatSession *active = [ChatHistoryManager sharedManager].activeSession;
         if (active) {
             [active.messages removeAllObjects];
-            active.title = @"Yeni Sohbet";
-            self.title = @"Yeni Sohbet";
+            active.title = LocalizedString(@"new_chat_title");
+            self.title = LocalizedString(@"new_chat_title");
             [[ChatHistoryManager sharedManager] saveSessions];
         }
         [self addWelcomeMessageIfNeeded];
@@ -721,6 +730,11 @@
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
 
+    // Sohbet akışında asistan tarafında dönecek geçici bekleme mesajı
+    ChatMessage *loadingMsg = [ChatMessage messageWithText:@"" sender:ChatMessageSenderAssistant];
+    loadingMsg.isLoading = YES;
+    [self.messages addObject:loadingMsg];
+
     [[ChatHistoryManager sharedManager] updateActiveSessionWithUserMessage:rawText];
     self.title = [ChatHistoryManager sharedManager].activeSession.title ?: @"ChatGPT";
     [self saveCurrentSessionState];
@@ -732,13 +746,19 @@
     [self setSendingState:YES];
     self.isSending = YES;
 
+    // Geçmiş mesajlar listesinden geçici loading mesajını hariç tutarak istek at
+    NSArray *historyForAPI = [self.messages filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"isLoading == NO"]];
+
     [[OpenAIClient sharedClient] sendMessage:rawText 
-                                     history:self.messages 
+                                     history:historyForAPI 
                                    webSearch:self.isWebSearchActive 
                                   completion:^(NSString *response, NSError *error) {
         
         [self setSendingState:NO];
         self.isSending = NO;
+
+        // Geçici loading mesajını çıkar
+        [self.messages removeObject:loadingMsg];
 
         if (error) {
             ChatMessage *errChat = [ChatMessage messageWithText:[NSString stringWithFormat:@"Hata: %@", error.localizedDescription] 
@@ -757,13 +777,12 @@
 }
 
 - (void)setSendingState:(BOOL)sending {
-    self.sendButton.hidden = sending;
     if (sending) {
-        [self.activityIndicator startAnimating];
         self.inputTextField.enabled = NO;
+        self.sendButton.enabled = NO;
     } else {
-        [self.activityIndicator stopAnimating];
         self.inputTextField.enabled = YES;
+        self.sendButton.enabled = YES;
     }
 }
 

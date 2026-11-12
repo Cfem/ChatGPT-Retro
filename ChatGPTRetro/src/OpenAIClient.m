@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 #import "OpenAIClient.h"
 #import "ChatMessage.h"
+#import "LocalizationManager.h"
 #include <curl/curl.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <Security/Security.h>
@@ -328,7 +329,11 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         if (combined.length > 0) {
             [combined appendString:@"\n\n"];
         }
-        [combined appendString:@"Web araması aktif. En güncel bilgilere göre cevap ver ve kaynakları/tarihleri belirt."];
+        if ([[LocalizationManager sharedManager] isTurkish]) {
+            [combined appendString:@"Web araması aktif. En güncel bilgilere göre cevap ver ve kaynakları/tarihleri belirt."];
+        } else {
+            [combined appendString:@"Web search is enabled. Answer using the most up-to-date information and cite sources/dates."];
+        }
     }
 
     return combined;

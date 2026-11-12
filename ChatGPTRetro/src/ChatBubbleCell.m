@@ -30,6 +30,10 @@ static const CGFloat kMaxBubbleWidthRatio = 0.92; // Geniş ve ekranı dolduran 
         _messageTextView.textContainer.lineFragmentPadding = 0;
         _messageTextView.dataDetectorTypes = UIDataDetectorTypeLink | UIDataDetectorTypePhoneNumber;
         [_bubbleBackgroundView addSubview:_messageTextView];
+
+        _spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
+        _spinner.hidesWhenStopped = YES;
+        [_bubbleBackgroundView addSubview:_spinner];
     }
     return self;
 }
@@ -301,6 +305,10 @@ static const CGFloat kMaxBubbleWidthRatio = 0.92; // Geniş ve ekranı dolduran 
 }
 
 + (CGFloat)heightForMessage:(ChatMessage *)message containerWidth:(CGFloat)width {
+    if (message.isLoading) {
+        return 48.0;
+    }
+
     if (message.cachedHeight > 0) {
         return message.cachedHeight;
     }
@@ -321,6 +329,26 @@ static const CGFloat kMaxBubbleWidthRatio = 0.92; // Geniş ve ekranı dolduran 
 
 - (void)configureWithMessage:(ChatMessage *)message containerWidth:(CGFloat)width {
     _message = message;
+
+    if (message.isLoading) {
+        _messageTextView.hidden = YES;
+        _spinner.hidden = NO;
+        [_spinner startAnimating];
+
+        CGFloat bubbleWidth = 60.0;
+        CGFloat bubbleHeight = 38.0;
+        _bubbleBackgroundView.backgroundColor = [UIColor colorWithRed:0.91 green:0.91 blue:0.93 alpha:1.0];
+        _bubbleBackgroundView.layer.borderColor = [UIColor colorWithWhite:0.84 alpha:1.0].CGColor;
+        _bubbleBackgroundView.layer.borderWidth = 0.5;
+        _bubbleBackgroundView.frame = CGRectMake(kHorizontalMargin, kVerticalMargin, bubbleWidth, bubbleHeight);
+        _spinner.frame = CGRectMake((bubbleWidth - 24.0) / 2.0, (bubbleHeight - 24.0) / 2.0, 24.0, 24.0);
+        return;
+    }
+
+    _messageTextView.hidden = NO;
+    [_spinner stopAnimating];
+    _spinner.hidden = YES;
+
     NSAttributedString *attr = [[self class] attributedTextForMessage:message];
     _messageTextView.attributedText = attr;
 
