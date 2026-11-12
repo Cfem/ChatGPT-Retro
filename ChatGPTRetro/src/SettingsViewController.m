@@ -331,7 +331,9 @@
         NSArray *rows = [self capabilityRowTypesForCurrentModel];
         if (indexPath.row < rows.count) extraKey = rows[indexPath.row];
     }
-    NSString *cellId = [NSString stringWithFormat:@"SettingCell_%ld_%ld_%@", (long)indexPath.section, (long)indexPath.row, extraKey];
+    NSString *cellId = (indexPath.section == 2 && indexPath.row < [OpenAIClient sharedClient].systemPromptsList.count)
+        ? [NSString stringWithFormat:@"PromptRow_%ld", (long)indexPath.row]
+        : [NSString stringWithFormat:@"SettingCell_%ld_%ld_%@", (long)indexPath.section, (long)indexPath.row, extraKey];
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
         // Sistem Talimatı satırları için Value1 (Solda kalın başlık, sağda gri özet metin)
@@ -451,14 +453,32 @@
             cell.detailTextLabel.textColor = [UIColor grayColor];
             cell.detailTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
 
-            // Her yerden tiklenebilir (Apple checkmark)
-            cell.accessoryType = isEnabled ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+            // Sol tarafta tikleme butonu (Dokunulabilir alan)
+            UIButton *checkBtn = (UIButton *)[cell.contentView viewWithTag:7777];
+            if (!checkBtn) {
+                checkBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+                checkBtn.frame = CGRectMake(0, 0, 50, 44);
+                checkBtn.tag = 7777;
+                [checkBtn addTarget:self action:@selector(togglePromptCheckmarkButton:) forControlEvents:UIControlEventTouchUpInside];
+                [cell.contentView addSubview:checkBtn];
+            }
+            checkBtn.tag = 7777 + indexPath.row;
+            [checkBtn setImage:(isEnabled ? [self greenCheckmarkImage] : [self emptyCheckmarkCircleImage]) forState:UIControlStateNormal];
 
-            // Satırın en sağına detay/düzenleme sayfasına geçiş için Disclosure Button (i simgesi)
-            UIButton *infoButton = [UIButton buttonWithType:UIButtonTypeDetailDisclosure];
-            infoButton.tag = 1000 + indexPath.row;
-            [infoButton addTarget:self action:@selector(instructionInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-            cell.accessoryView = infoButton;
+            // Başlık & Açıklama (Tik butonunun sağına yerleşir)
+            cell.textLabel.text = [NSString stringWithFormat:@"     %@", title];
+            cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
+            cell.textLabel.textColor = [UIColor blackColor];
+            cell.textLabel.numberOfLines = 1;
+
+            cell.detailTextLabel.text = cleanContent;
+            cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
+            cell.detailTextLabel.textColor = [UIColor grayColor];
+            cell.detailTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+
+            // Kullanıcı isteği: "(i) işareti ile değil sağa ok ile olsun"
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.accessoryView = nil;
         } else {
             // "+ Yeni Talimat Ekle" satırı
             cell.textLabel.text = LocalizedString(@"add_prompt_button");
@@ -501,6 +521,61 @@
     return cell;
 }
 
+- (UIImage *)greenCheckmarkImage {
+    static UIImage *img = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(22, 22), NO, 0.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        [[UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0] setStroke];
+        CGContextSetLineWidth(ctx, 2.5);
+        CGContextSetLineCap(ctx, kCGLineCapRound);
+        CGContextSetLineJoin(ctx, kCGLineJoinRound);
+
+        CGContextBeginPath(ctx);
+        CGContextMoveToPoint(ctx, 4, 11);
+        CGContextAddLineToPoint(ctx, 9, 16);
+        CGContextAddLineToPoint(ctx, 18, 6);
+        CGContextStrokePath(ctx);
+
+        img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+    });
+    return img;
+}
+
+- (UIImage *)emptyCheckmarkCircleImage {
+    static UIImage *img = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(22, 22), NO, 0.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        [[UIColor colorWithWhite:0.8 alpha:1.0] setStroke];
+        CGContextSetLineWidth(ctx, 1.5);
+        CGContextStrokeEllipseInRect(ctx, CGRectMake(2, 2, 18, 18));
+
+        img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+    });
+    return img;
+}
+
+- (void)togglePromptCheckmarkButton:(UIButton *)sender {
+    NSInteger index = sender.tag - 7777;
+    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+    if (index >= 0 && index < (NSInteger)list.count) {
+        NSMutableDictionary *item = list[index];
+        BOOL current = [item[@"enabled"] boolValue];
+        item[@"enabled"] = @(!current);
+        [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+        [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:index inSection:2]]
+                              withRowAnimation:UITableViewRowAnimationNone];
+        if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+            [self.delegate settingsDidUpdate];
+        }
+    }
+}
+
 - (void)instructionInfoButtonTapped:(UIButton *)sender {
     NSInteger index = sender.tag - 1000;
     [self openInstructionDetailAtIndex:index];
@@ -539,15 +614,8 @@
     } else if (indexPath.section == 2) {
         NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
         if (indexPath.row < (NSInteger)list.count) {
-            // Kullanıcı isteği: Satırın neresine tıklanırsa tıklansın tikle / tiki kaldır
-            NSMutableDictionary *item = list[indexPath.row];
-            BOOL current = [item[@"enabled"] boolValue];
-            item[@"enabled"] = @(!current);
-            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-            [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
-            if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                [self.delegate settingsDidUpdate];
-            }
+            // Tıklandığında detay sayfasına sağa ok ile git
+            [self openInstructionDetailAtIndex:indexPath.row];
         } else {
             // "+ Yeni Talimat Ekle" satırına tıklandığında sağa giden yeni talimat sayfasına git
             [self openInstructionDetailAtIndex:-1];

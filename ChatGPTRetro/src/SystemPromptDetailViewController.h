@@ -5,7 +5,7 @@
 - (void)systemPromptDidSaveOrDelete;
 @end
 
-@interface SystemPromptDetailViewController : UITableViewController
+@interface SystemPromptDetailViewController : UIViewController
 
 @property (nonatomic, weak) id<SystemPromptDetailDelegate> delegate;
 @property (nonatomic, assign) NSInteger promptIndex; // -1 if new
