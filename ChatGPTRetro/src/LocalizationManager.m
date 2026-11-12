@@ -45,12 +45,29 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
     return [current hasPrefix:@"tr"];
 }
 
+- (NSArray<NSDictionary *> *)availableLanguages {
+    return @[
+        @{ @"code": @(AppLanguageAuto),    @"key": @"lang_auto" },
+        @{ @"code": @(AppLanguageTurkish), @"key": @"lang_tr" },
+        @{ @"code": @(AppLanguageEnglish), @"key": @"lang_en" }
+    ];
+}
+
+- (NSString *)displayNameForLanguage:(AppLanguage)lang {
+    for (NSDictionary *d in [self availableLanguages]) {
+        if ([d[@"code"] integerValue] == lang) {
+            return [self stringForKey:d[@"key"]];
+        }
+    }
+    return @"Unknown";
+}
+
 - (void)setupDictionaries {
     _trDict = @{
         @"app_title": @"ChatGPT",
-        @"sidebar_chats": @"☰ Sohbetler",
+        @"sidebar_chats": @"Sohbetler",
         @"settings_title": @"Ayarlar",
-        @"new_chat_button": @"＋ Yeni Sohbet Başlat",
+        @"new_chat_button": @"+ Yeni Sohbet",
         @"new_chat_title": @"Yeni Sohbet",
         @"input_placeholder": @"Mesajınızı yazın...",
         @"send_button": @"Gönder",
@@ -62,42 +79,52 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"cancel_button": @"Vazgeç",
         @"history_title": @"Geçmiş Sohbetler",
         @"msg_count_format": @"%lu mesaj • %@",
-        @"section_siwc": @"SIGN IN WITH CHATGPT (PLAN KULLANIMI)",
+        @"section_siwc": @"CHATGPT İLE GİRİŞ YAP (HESAP / PLAN)",
         @"section_model": @"CHATGPT MODELİ",
-        @"section_instructions": @"ÖZEL SİSTEM TALİMATI & BELLEK",
+        @"section_instructions": @"ÖZEL SİSTEM TALİMATI VE BELLEK",
         @"section_apikey": @"OPENAI API ANAHTARI (OPSİYONEL)",
-        @"section_language": @"DİL SEÇENEĞİ (LANGUAGE)",
+        @"section_language": @"DİL SEÇENEĞİ",
         @"section_system": @"SİSTEM BİLGİSİ",
-        @"siwc_login_btn": @"🟢 Continue with ChatGPT (Safari/QR)",
-        @"siwc_manual_btn": @"🔗 Doğrulama Linkini Manuel Yapıştır",
-        @"siwc_connected": @"🟢 Connected",
+        @"language_label": @"Uygulama Dili",
+        @"siwc_login_btn": @"ChatGPT ile Devam Et (Safari/QR)",
+        @"siwc_manual_btn": @"Doğrulama Linkini Manuel Yapıştır",
+        @"siwc_connected": @"Bağlandı",
         @"siwc_status": @"Durum",
-        @"siwc_enabled": @"ChatGPT plan usage is enabled",
-        @"siwc_identity_only": @"Identity only",
-        @"siwc_manage": @"📊 Manage usage (chatgpt.com/settings/usage)",
-        @"siwc_disconnect": @"🔴 Bağlantıyı Kes (Disconnect)",
-        @"fetch_models_btn": @"🔄 Modelleri Canlı Güncelle",
+        @"siwc_enabled": @"ChatGPT plan kullanımı devrede",
+        @"siwc_identity_only": @"Yalnızca kimlik",
+        @"siwc_manage": @"Kullanımı Yönet (chatgpt.com)",
+        @"siwc_disconnect": @"Hesap Bağlantısını Kes",
+        @"fetch_models_btn": @"Modelleri Canlı Güncelle",
         @"fetching_models": @"Modeller taranıyor...",
         @"lang_auto": @"Otomatik (Cihaz Dili)",
         @"lang_tr": @"Türkçe",
         @"lang_en": @"English",
-        @"instructions_placeholder": @"ChatGPT'nin sizi nasıl tanımasını istediğinizi yazın...",
+        @"instructions_placeholder": @"ChatGPT'nin sizi nasıl tanımasını istediğinizi ve bağlamı buraya yazın...",
         @"instructions_footer": @"ChatGPT'nin sizi tanıması ve bağlamınızı hiç unutmamasını istediğiniz bilgileri buraya yazın. Tüm sohbetlerde otomatik uygulanır.",
-        @"welcome_msg": @"👋 ChatGPT Retro'ya Hoş Geldiniz!\n\nBu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle doğrudan sohbet etmeniz için uyarlandı.\n\n💬 Sol üstteki '☰ Sohbetler' menüsünden geçmiş konuşmalarınıza ulaşabilir, sağdan 'Ayarlar' çekmecesini açabilirsiniz.",
-        @"auth_prompt_title": @"ChatGPT Girişi Gerekli",
+        @"welcome_msg": @"ChatGPT Retro'ya Hoş Geldiniz!\n\nBu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle doğrudan sohbet etmeniz için hazırlandı.\n\nSol üstteki 'Sohbetler' menüsünden geçmiş konuşmalarınıza ulaşabilir, sağ üstteki dişli simgesinden ayarları açabilirsiniz.",
+        @"auth_prompt_title": @"Giriş Yapılması Gerekli",
         @"auth_prompt_msg": @"ChatGPT ile konuşabilmek için ChatGPT hesabınızla giriş yapabilir veya Ayarlar'dan API Anahtarı girebilirsiniz.",
-        @"auth_prompt_login": @"ChatGPT ile Giriş Yap (QR / Telefon)",
-        @"auth_prompt_settings": @"Ayarlar'ı Aç",
+        @"auth_prompt_login": @"ChatGPT ile Giriş Yap",
+        @"auth_prompt_settings": @"Ayarları Aç",
         @"auth_status_ready": @" [Hazır]",
         @"auth_status_need_login": @" [Giriş Gerekli]",
-        @"auth_status_plan": @" [ChatGPT Planı]"
+        @"auth_status_plan": @" [ChatGPT Planı]",
+        @"qr_step1_desc": @"1. iPhone veya modern cihazınızın kamerasıyla bu QR kodu okutup giriş yapın:",
+        @"qr_copy_link": @"Giriş Linkini Panoya Kopyala",
+        @"qr_step2_desc": @"2. Telefonda onaylayınca tarayıcının adres çubuğunda kalan yönlendirme linkini buraya yapıştırın:",
+        @"qr_paste_btn": @"Panodan Yapıştır ve Girişi Tamamla",
+        @"qr_safari_btn": @"iPad Safari'sinde Doğrudan Aç",
+        @"model_label": @"Model",
+        @"apikey_label": @"API Anahtarı",
+        @"host_id_label": @"Cihaz Kimliği",
+        @"version_label": @"Sürüm"
     };
 
     _enDict = @{
         @"app_title": @"ChatGPT",
-        @"sidebar_chats": @"☰ Chats",
+        @"sidebar_chats": @"Chats",
         @"settings_title": @"Settings",
-        @"new_chat_button": @"＋ Start New Chat",
+        @"new_chat_button": @"+ New Chat",
         @"new_chat_title": @"New Chat",
         @"input_placeholder": @"Type a message...",
         @"send_button": @"Send",
@@ -113,31 +140,41 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"section_model": @"CHATGPT MODEL",
         @"section_instructions": @"CUSTOM SYSTEM INSTRUCTIONS & MEMORY",
         @"section_apikey": @"OPENAI API KEY (OPTIONAL)",
-        @"section_language": @"LANGUAGE SELECTION",
+        @"section_language": @"LANGUAGE",
         @"section_system": @"SYSTEM INFO",
-        @"siwc_login_btn": @"🟢 Continue with ChatGPT (Safari/QR)",
-        @"siwc_manual_btn": @"🔗 Paste Verification URL Manually",
-        @"siwc_connected": @"🟢 Connected",
+        @"language_label": @"App Language",
+        @"siwc_login_btn": @"Continue with ChatGPT (Safari/QR)",
+        @"siwc_manual_btn": @"Paste Verification URL Manually",
+        @"siwc_connected": @"Connected",
         @"siwc_status": @"Status",
         @"siwc_enabled": @"ChatGPT plan usage is enabled",
         @"siwc_identity_only": @"Identity only",
-        @"siwc_manage": @"📊 Manage usage (chatgpt.com/settings/usage)",
-        @"siwc_disconnect": @"🔴 Disconnect Account",
-        @"fetch_models_btn": @"🔄 Fetch Live Models",
+        @"siwc_manage": @"Manage Usage (chatgpt.com)",
+        @"siwc_disconnect": @"Disconnect Account",
+        @"fetch_models_btn": @"Fetch Live Models",
         @"fetching_models": @"Fetching models...",
-        @"lang_auto": @"Automatic (System Language)",
+        @"lang_auto": @"Automatic (Device Language)",
         @"lang_tr": @"Türkçe",
         @"lang_en": @"English",
         @"instructions_placeholder": @"Tell ChatGPT what you want it to remember about you...",
-        @"instructions_footer": @"Information you want ChatGPT to remember across all your conversations (name, background, preferred response tone, etc.).",
-        @"welcome_msg": @"👋 Welcome to ChatGPT Retro!\n\nAdapted for iPad Mini 1 (iOS 8.4) to chat directly with OpenAI models.\n\n💬 Access past chats from the '☰ Chats' menu on the left, or open 'Settings' on the right.",
-        @"auth_prompt_title": @"ChatGPT Authentication Required",
+        @"instructions_footer": @"Information you want ChatGPT to remember across all conversations (name, background, preferred tone, etc.).",
+        @"welcome_msg": @"Welcome to ChatGPT Retro!\n\nAdapted for iPad Mini 1 (iOS 8.4) to chat directly with OpenAI models.\n\nAccess past chats from the 'Chats' menu on the left, or open Settings via the gear icon on the right.",
+        @"auth_prompt_title": @"Authentication Required",
         @"auth_prompt_msg": @"Please sign in with your ChatGPT account or enter an OpenAI API key in Settings to continue.",
-        @"auth_prompt_login": @"Sign In with ChatGPT (QR / Phone)",
+        @"auth_prompt_login": @"Sign In with ChatGPT",
         @"auth_prompt_settings": @"Open Settings",
         @"auth_status_ready": @" [Ready]",
         @"auth_status_need_login": @" [Login Required]",
-        @"auth_status_plan": @" [ChatGPT Plan]"
+        @"auth_status_plan": @" [ChatGPT Plan]",
+        @"qr_step1_desc": @"1. Scan this QR code with your iPhone or modern device camera to sign in:",
+        @"qr_copy_link": @"Copy Sign In Link to Clipboard",
+        @"qr_step2_desc": @"2. Once confirmed on your phone, paste the redirect URL from the browser address bar here:",
+        @"qr_paste_btn": @"Paste from Clipboard and Complete",
+        @"qr_safari_btn": @"Open Directly in iPad Safari",
+        @"model_label": @"Model",
+        @"apikey_label": @"API Key",
+        @"host_id_label": @"Device ID",
+        @"version_label": @"Version"
     };
 }
 
@@ -146,7 +183,6 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
     NSDictionary *target = tr ? self.trDict : self.enDict;
     NSString *val = target[key];
     if (val) return val;
-    // Fallback to English dictionary
     return self.enDict[key] ?: key;
 }
 

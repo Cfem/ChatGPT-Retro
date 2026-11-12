@@ -114,17 +114,27 @@
 }
 
 - (void)setupNavigationItems {
-    // Sol: Sadece "☰ Sohbetler" Butonu (Yerelleştirilmiş)
+    // Sol: "Sohbetler" Butonu (Yerelleştirilmiş, emojiden arındırılmış)
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"sidebar_chats")
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:self
                                                                             action:@selector(toggleSidebar)];
 
-    // Sağ: Yeni Sohbet (+) ve Ayarlar Butonları (Yerelleştirilmiş)
-    UIBarButtonItem *settingsBtn = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"settings_title")
-                                                                    style:UIBarButtonItemStylePlain
-                                                                   target:self
-                                                                   action:@selector(openSettingsTapped)];
+    // Sağ: Ayarlar (Klasik Apple Dişli İkonu) ve Yeni Sohbet (+) Butonları
+    UIImage *gearImg = [UIImage imageNamed:@"SettingsGear"];
+    UIBarButtonItem *settingsBtn;
+    if (gearImg) {
+        gearImg = [gearImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        settingsBtn = [[UIBarButtonItem alloc] initWithImage:gearImg
+                                                       style:UIBarButtonItemStylePlain
+                                                      target:self
+                                                      action:@selector(openSettingsTapped)];
+    } else {
+        settingsBtn = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"settings_title")
+                                                       style:UIBarButtonItemStylePlain
+                                                      target:self
+                                                      action:@selector(openSettingsTapped)];
+    }
 
     UIBarButtonItem *newChatBtn = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCompose
                                                                                 target:self
@@ -138,19 +148,20 @@
 - (CGFloat)sidebarWidth {
     CGFloat screenW = self.view.window.bounds.size.width;
     if (screenW <= 0) screenW = self.view.bounds.size.width;
-    // iOS 8 iPad için ideal kenar çekmecesi genişliği: 320pt
-    CGFloat w = 320.0;
-    if (screenW > 0 && w > screenW * 0.8) w = screenW * 0.8;
+    // iOS 8 iPad için ideal kenar çekmecesi genişliği: 320pt veya %35
+    CGFloat w = screenW * 0.35;
+    if (w < 300.0) w = 300.0;
+    if (screenW > 0 && w > screenW * 0.6) w = screenW * 0.6;
     return w;
 }
 
 - (CGFloat)settingsWidth {
     CGFloat screenW = self.view.window.bounds.size.width;
     if (screenW <= 0) screenW = self.view.bounds.size.width;
-    // Enlemesine geniş sağ çekmece (iPad ekranının %58'i veya minimum 440pt)
-    CGFloat w = screenW * 0.58;
-    if (w < 420.0) w = 420.0;
-    if (screenW > 0 && w > screenW * 0.9) w = screenW * 0.9;
+    // Enlemesine geniş sağ çekmece (iPad ekranının %65'i)
+    CGFloat w = screenW * 0.65;
+    if (w < 440.0) w = 440.0;
+    if (screenW > 0 && w > screenW * 0.85) w = screenW * 0.85;
     return w;
 }
 
@@ -488,13 +499,19 @@
     topLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [_inputContainerView addSubview:topLine];
 
-    // Web Arama Butonu (GeminiRetro stili)
+    // Web Arama Butonu (Temiz Vektör İkonu)
     _webSearchButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _webSearchButton.frame = CGRectMake(8, 7, 36, 36);
     _webSearchButton.layer.cornerRadius = 18.0;
     _webSearchButton.layer.masksToBounds = YES;
-    [_webSearchButton setTitle:@"🌐" forState:UIControlStateNormal];
-    _webSearchButton.titleLabel.font = [UIFont systemFontOfSize:19.0];
+    UIImage *globeImg = [[UIImage imageNamed:@"GlobeIcon"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (globeImg) {
+        [_webSearchButton setImage:globeImg forState:UIControlStateNormal];
+        _webSearchButton.tintColor = [UIColor darkGrayColor];
+    } else {
+        [_webSearchButton setTitle:@"Web" forState:UIControlStateNormal];
+        _webSearchButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:13.0];
+    }
     [_webSearchButton addTarget:self action:@selector(toggleWebSearch) forControlEvents:UIControlEventTouchUpInside];
     [self updateWebSearchButtonAppearance];
     [_inputContainerView addSubview:_webSearchButton];
@@ -553,10 +570,12 @@
         self.webSearchButton.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:0.18];
         self.webSearchButton.layer.borderWidth = 1.5;
         self.webSearchButton.layer.borderColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0].CGColor;
+        self.webSearchButton.tintColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
     } else {
         self.webSearchButton.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
         self.webSearchButton.layer.borderWidth = 0.5;
         self.webSearchButton.layer.borderColor = [UIColor colorWithWhite:0.8 alpha:1.0].CGColor;
+        self.webSearchButton.tintColor = [UIColor darkGrayColor];
     }
 }
 

@@ -3,12 +3,13 @@
 #import "ChatGPTLoginModalViewController.h"
 #import "LocalizationManager.h"
 
-@interface SettingsViewController () <ChatGPTLoginModalDelegate>
+@interface SettingsViewController () <ChatGPTLoginModalDelegate, UIPickerViewDataSource, UIPickerViewDelegate>
 
 @property (nonatomic, strong) UITextField *apiKeyField;
 @property (nonatomic, strong) UITextField *modelField;
 @property (nonatomic, strong) UITextView *systemInstructionTextView;
-@property (nonatomic, strong) UISegmentedControl *languageSegment;
+@property (nonatomic, strong) UITextField *languagePickerField;
+@property (nonatomic, strong) UIPickerView *languagePicker;
 @property (nonatomic, assign) BOOL isFetchingModels;
 @property (nonatomic, assign) BOOL isSigningIn;
 
@@ -53,6 +54,8 @@
         self.title = LocalizedString(@"settings_title");
         self.navigationItem.leftBarButtonItem.title = LocalizedString(@"close_button");
         self.navigationItem.rightBarButtonItem.title = LocalizedString(@"save_button");
+        [self updateLanguageFieldText];
+        [self.languagePicker reloadAllComponents];
         [self.tableView reloadData];
     });
 }
@@ -68,14 +71,34 @@
 }
 
 - (void)setupFields {
-    // 1. Language Segmented Control
-    _languageSegment = [[UISegmentedControl alloc] initWithItems:@[LocalizedString(@"lang_auto"), LocalizedString(@"lang_tr"), LocalizedString(@"lang_en")]];
-    _languageSegment.selectedSegmentIndex = [LocalizationManager sharedManager].selectedLanguage;
-    _languageSegment.tintColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
-    [_languageSegment addTarget:self action:@selector(languageSegmentChanged:) forControlEvents:UIControlEventValueChanged];
+    // 1. Language Picker Field & Accessory Toolbar (iOS classic bottom wheel)
+    _languagePicker = [[UIPickerView alloc] init];
+    _languagePicker.dataSource = self;
+    _languagePicker.delegate = self;
+
+    _languagePickerField = [[UITextField alloc] initWithFrame:CGRectZero];
+    _languagePickerField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    _languagePickerField.inputView = _languagePicker;
+    _languagePickerField.textAlignment = NSTextAlignmentRight;
+    _languagePickerField.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
+    _languagePickerField.textColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
+
+    UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    pickerToolbar.barStyle = UIBarStyleDefault;
+    UIBarButtonItem *flex = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+    UIBarButtonItem *doneBtn = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"ok_button")
+                                                                style:UIBarButtonItemStyleDone
+                                                               target:self
+                                                               action:@selector(languagePickerDone)];
+    pickerToolbar.items = @[flex, doneBtn];
+    _languagePickerField.inputAccessoryView = pickerToolbar;
+
+    [self selectCurrentLanguageInPickerAnimated:NO];
+    [self updateLanguageFieldText];
 
     // 2. API Key
     _apiKeyField = [[UITextField alloc] initWithFrame:CGRectZero];
+    _apiKeyField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _apiKeyField.placeholder = @"sk-... (API Key)";
     _apiKeyField.text = [OpenAIClient sharedClient].apiKey;
     _apiKeyField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
@@ -86,6 +109,7 @@
 
     // 3. Model
     _modelField = [[UITextField alloc] initWithFrame:CGRectZero];
+    _modelField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _modelField.placeholder = @"gpt-4o-mini";
     _modelField.text = [OpenAIClient sharedClient].selectedModel;
     _modelField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
@@ -93,15 +117,58 @@
     _modelField.autocorrectionType = UITextAutocorrectionTypeNo;
     _modelField.clearButtonMode = UITextFieldViewModeWhileEditing;
 
-    // 4. Custom System Instructions
+    // 4. Custom System Instructions (Daha geniş, uzun metinler için uygun)
     _systemInstructionTextView = [[UITextView alloc] initWithFrame:CGRectZero];
+    _systemInstructionTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _systemInstructionTextView.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
     _systemInstructionTextView.backgroundColor = [UIColor clearColor];
     _systemInstructionTextView.text = [OpenAIClient sharedClient].customSystemInstruction;
 }
 
-- (void)languageSegmentChanged:(UISegmentedControl *)sender {
-    [LocalizationManager sharedManager].selectedLanguage = sender.selectedSegmentIndex;
+- (void)updateLanguageFieldText {
+    _languagePickerField.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
+}
+
+- (void)selectCurrentLanguageInPickerAnimated:(BOOL)animated {
+    NSArray *langs = [[LocalizationManager sharedManager] availableLanguages];
+    AppLanguage current = [LocalizationManager sharedManager].selectedLanguage;
+    for (NSInteger i = 0; i < langs.count; i++) {
+        if ([langs[i][@"code"] integerValue] == current) {
+            [self.languagePicker selectRow:i inComponent:0 animated:animated];
+            break;
+        }
+    }
+}
+
+- (void)languagePickerDone {
+    [self.languagePickerField resignFirstResponder];
+}
+
+#pragma mark - UIPickerView DataSource & Delegate
+
+- (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
+    return 1;
+}
+
+- (NSInteger)pickerView:(UIPickerView *)pickerView numberOfRowsInComponent:(NSInteger)component {
+    return [[LocalizationManager sharedManager] availableLanguages].count;
+}
+
+- (NSString *)pickerView:(UIPickerView *)pickerView titleForRow:(NSInteger)row forComponent:(NSInteger)component {
+    NSArray *langs = [[LocalizationManager sharedManager] availableLanguages];
+    if (row < langs.count) {
+        NSString *key = langs[row][@"key"];
+        return LocalizedString(key);
+    }
+    return @"";
+}
+
+- (void)pickerView:(UIPickerView *)pickerView didSelectRow:(NSInteger)row inComponent:(NSInteger)component {
+    NSArray *langs = [[LocalizationManager sharedManager] availableLanguages];
+    if (row < langs.count) {
+        AppLanguage selected = (AppLanguage)[langs[row][@"code"] integerValue];
+        [LocalizationManager sharedManager].selectedLanguage = selected;
+    }
 }
 
 - (void)closeButtonTapped {
@@ -157,7 +224,7 @@
     [self.view endEditing:YES];
     UIAlertController *prompt = [UIAlertController alertControllerWithTitle:LocalizedString(@"siwc_manual_btn")
                                                                     message:@"http://127.0.0.1:8787/auth/callback?code=..."
-                                                             preferredStyle:UIAlertControllerStyleAlert];
+                                                              preferredStyle:UIAlertControllerStyleAlert];
     [prompt addTextFieldWithConfigurationHandler:^(UITextField *textField) {
         textField.placeholder = @"http://127.0.0.1:8787/auth/callback?code=...";
         textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
@@ -175,7 +242,7 @@
                     }
                     [self showAlertWithTitle:LocalizedString(@"saved_alert_title") message:LocalizedString(@"siwc_enabled")];
                 } else {
-                    [self showAlertWithTitle:@"Error" message:error.localizedDescription];
+                    [self showAlertWithTitle:@"Hata" message:error.localizedDescription];
                 }
             }];
         }
@@ -224,13 +291,13 @@
     [[OpenAIClient sharedClient] fetchAvailableModelsWithCompletion:^(NSArray *models, NSError *error) {
         self.isFetchingModels = NO;
         if (error) {
-            [self showAlertWithTitle:@"Error" message:error.localizedDescription];
+            [self showAlertWithTitle:@"Hata" message:error.localizedDescription];
             [self.tableView reloadData];
             return;
         }
 
         if (models.count == 0) {
-            [self showAlertWithTitle:@"Error" message:@"No models found."];
+            [self showAlertWithTitle:@"Hata" message:@"Model bulunamadı."];
             [self.tableView reloadData];
             return;
         }
@@ -300,7 +367,8 @@
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.section == 3) {
-        return 96.0; // Text view
+        // Genişletilmiş metin kutusu boyutu (uzun sistem talimatları için)
+        return 180.0;
     }
     return 44.0;
 }
@@ -323,16 +391,20 @@
     UIColor *openAIGreen = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
 
     if (indexPath.section == 0) {
-        // Dil Seçici Segment
+        // iOS Klasik Alttan Çarklı Dil Seçici Hücresi
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        self.languageSegment.frame = CGRectMake(14, 6, w - 28, 32);
-        [cell.contentView addSubview:self.languageSegment];
+        cell.textLabel.text = LocalizedString(@"language_label");
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+
+        CGFloat labelWidth = 140.0;
+        self.languagePickerField.frame = CGRectMake(labelWidth, 8, w - labelWidth - 36, 28);
+        [cell.contentView addSubview:self.languagePickerField];
     } else if (indexPath.section == 1) {
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
             if (indexPath.row == 0) {
                 cell.selectionStyle = UITableViewCellSelectionStyleNone;
                 NSString *email = [OpenAIClient sharedClient].userEmail;
-                cell.textLabel.text = (email && email.length > 0) ? email : @"Connection 1";
+                cell.textLabel.text = (email && email.length > 0) ? email : @"Hesap";
                 cell.detailTextLabel.text = LocalizedString(@"siwc_connected");
                 cell.detailTextLabel.textColor = openAIGreen;
             } else if (indexPath.row == 1) {
@@ -364,8 +436,9 @@
     } else if (indexPath.section == 2) {
         if (indexPath.row == 0) {
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = @"Model";
-            self.modelField.frame = CGRectMake(110, 8, w - 126, 28);
+            cell.textLabel.text = LocalizedString(@"model_label");
+            CGFloat labelW = 100.0;
+            self.modelField.frame = CGRectMake(labelW, 8, w - labelW - 16, 28);
             [cell.contentView addSubview:self.modelField];
         } else {
             if (self.isFetchingModels) {
@@ -381,22 +454,24 @@
         }
     } else if (indexPath.section == 3) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        self.systemInstructionTextView.frame = CGRectMake(16, 6, w - 32, 84);
+        // Uzatılmış sistem talimatı alanı
+        self.systemInstructionTextView.frame = CGRectMake(16, 8, w - 32, 164);
         [cell.contentView addSubview:self.systemInstructionTextView];
     } else if (indexPath.section == 4) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        cell.textLabel.text = @"API Key";
-        self.apiKeyField.frame = CGRectMake(110, 8, w - 126, 28);
+        cell.textLabel.text = LocalizedString(@"apikey_label");
+        CGFloat labelW = 110.0;
+        self.apiKeyField.frame = CGRectMake(labelW, 8, w - labelW - 16, 28);
         [cell.contentView addSubview:self.apiKeyField];
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         if (indexPath.row == 0) {
-            cell.textLabel.text = @"Host ID";
+            cell.textLabel.text = LocalizedString(@"host_id_label");
             cell.detailTextLabel.text = [OpenAIClient sharedClient].hostId;
             cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:11.0];
         } else {
-            cell.textLabel.text = @"Version";
-            cell.detailTextLabel.text = @"v1.5 (Bilingual & Side Drawer)";
+            cell.textLabel.text = LocalizedString(@"version_label");
+            cell.detailTextLabel.text = @"v1.6 (Pure iOS 8 UI)";
         }
     }
 
@@ -406,7 +481,9 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
-    if (indexPath.section == 1) {
+    if (indexPath.section == 0) {
+        [self.languagePickerField becomeFirstResponder];
+    } else if (indexPath.section == 1) {
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
             if (indexPath.row == 2) {
                 [self manageUsageAction];
