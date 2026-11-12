@@ -6,7 +6,8 @@
 
 @property (nonatomic, strong) UITextField *titleTextField;
 @property (nonatomic, strong) UITextView *contentTextView;
-@property (nonatomic, strong) UIView *cardView;
+@property (nonatomic, strong) UIView *titleBox;
+@property (nonatomic, strong) UIView *contentBox;
 @property (nonatomic, assign) BOOL isDeleted;
 
 @end
@@ -16,9 +17,8 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = (_promptIndex >= 0) ? LocalizedString(@"edit_prompt_title") : LocalizedString(@"add_prompt_title");
-    self.view.backgroundColor = [UIColor colorWithRed:239.0/255.0 green:239.0/255.0 blue:244.0/255.0 alpha:1.0]; // Klasik Apple iOS 8 grouped arkaplan gri rengi
+    self.view.backgroundColor = [UIColor colorWithRed:239.0/255.0 green:239.0/255.0 blue:244.0/255.0 alpha:1.0]; // Apple Grouped TableView arka planı
 
-    // Sağ üstte Kırmızı "Sil" butonu (eğer var olan bir talimatsa)
     if (self.promptIndex >= 0) {
         UIBarButtonItem *deleteBtn = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"delete_button")
                                                                       style:UIBarButtonItemStylePlain
@@ -38,24 +38,21 @@
                                                object:nil];
 
     CGFloat w = self.view.bounds.size.width;
-    CGFloat h = self.view.bounds.size.height;
     CGFloat margin = 16.0;
-    CGFloat topOffset = 84.0; // Üst navigation bar ve margin boşluğu
+    CGFloat boxW = w - (margin * 2);
+    CGFloat topOffset = 76.0;
 
-    // Apple Grouped Kartı (Kenarlardan ve üstten/alttan margin bırakılmış şık beyaz kart)
-    _cardView = [[UIView alloc] initWithFrame:CGRectMake(margin, topOffset, w - (margin * 2), h - topOffset - margin)];
-    _cardView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _cardView.backgroundColor = [UIColor whiteColor];
-    _cardView.layer.cornerRadius = 8.0;
-    _cardView.layer.masksToBounds = YES;
-    _cardView.layer.borderWidth = 0.5;
-    _cardView.layer.borderColor = [UIColor colorWithWhite:0.80 alpha:1.0].CGColor;
-    [self.view addSubview:_cardView];
+    // 1. KUTU: BAŞLIK KUTUSU (Apple Grouped Kart)
+    _titleBox = [[UIView alloc] initWithFrame:CGRectMake(margin, topOffset, boxW, 44.0)];
+    _titleBox.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    _titleBox.backgroundColor = [UIColor whiteColor];
+    _titleBox.layer.cornerRadius = 8.0;
+    _titleBox.layer.masksToBounds = YES;
+    _titleBox.layer.borderWidth = 0.5;
+    _titleBox.layer.borderColor = [UIColor colorWithWhite:0.78 alpha:1.0].CGColor;
+    [self.view addSubview:_titleBox];
 
-    CGFloat cardW = _cardView.bounds.size.width;
-
-    // 1. Başlık Text Kutusu
-    _titleTextField = [[UITextField alloc] initWithFrame:CGRectMake(14, 8, cardW - 28, 36)];
+    _titleTextField = [[UITextField alloc] initWithFrame:CGRectMake(14, 4, boxW - 28, 36)];
     _titleTextField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _titleTextField.placeholder = LocalizedString(@"prompt_title_placeholder");
     _titleTextField.text = self.initialTitle ?: @"";
@@ -64,17 +61,21 @@
     _titleTextField.clearButtonMode = UITextFieldViewModeWhileEditing;
     _titleTextField.autocapitalizationType = UITextAutocapitalizationTypeSentences;
     _titleTextField.delegate = self;
-    [_cardView addSubview:_titleTextField];
+    [_titleBox addSubview:_titleTextField];
 
-    // Klasik iOS Apple Seperator Çizgisi
-    UIView *separator = [[UIView alloc] initWithFrame:CGRectMake(14, 50, cardW - 14, 0.5)];
-    separator.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    separator.backgroundColor = [UIColor colorWithWhite:0.80 alpha:1.0]; // Klasik Apple separator rengi
-    [_cardView addSubview:separator];
+    // 2. KUTU: METİN GÖVDESİ KUTUSU (Ayrı Kart, klavye ile dinamik boylanan)
+    CGFloat contentTop = topOffset + 44.0 + 12.0; // İki kutu arasında net 12px boşluk
+    CGFloat contentH = self.view.bounds.size.height - contentTop - margin;
+    _contentBox = [[UIView alloc] initWithFrame:CGRectMake(margin, contentTop, boxW, contentH)];
+    _contentBox.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    _contentBox.backgroundColor = [UIColor whiteColor];
+    _contentBox.layer.cornerRadius = 8.0;
+    _contentBox.layer.masksToBounds = YES;
+    _contentBox.layer.borderWidth = 0.5;
+    _contentBox.layer.borderColor = [UIColor colorWithWhite:0.78 alpha:1.0].CGColor;
+    [self.view addSubview:_contentBox];
 
-    // 2. Metin / Talimat Text Kutusu (İçeriden rahat marginler, akıcı kaydırma)
-    CGFloat textTop = 52.0;
-    _contentTextView = [[UITextView alloc] initWithFrame:CGRectMake(10, textTop, cardW - 20, _cardView.bounds.size.height - textTop - 8)];
+    _contentTextView = [[UITextView alloc] initWithFrame:CGRectMake(10, 8, boxW - 20, _contentBox.bounds.size.height - 16)];
     _contentTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _contentTextView.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
     _contentTextView.textColor = [UIColor blackColor];
@@ -83,7 +84,7 @@
     _contentTextView.alwaysBounceVertical = YES;
     _contentTextView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     _contentTextView.delegate = self;
-    [_cardView addSubview:_contentTextView];
+    [_contentBox addSubview:_contentTextView];
 }
 
 - (void)dealloc {
@@ -98,10 +99,10 @@
     if (bottomInset < 0) bottomInset = 0;
 
     CGFloat margin = 16.0;
-    CGFloat topOffset = 84.0;
-    CGFloat cardH = self.view.bounds.size.height - topOffset - margin - bottomInset;
-    if (cardH < 120.0) cardH = 120.0;
-    _cardView.frame = CGRectMake(margin, topOffset, self.view.bounds.size.width - (margin * 2), cardH);
+    CGFloat contentTop = 76.0 + 44.0 + 12.0;
+    CGFloat boxH = self.view.bounds.size.height - contentTop - margin - bottomInset;
+    if (boxH < 100.0) boxH = 100.0;
+    _contentBox.frame = CGRectMake(margin, contentTop, self.view.bounds.size.width - (margin * 2), boxH);
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -163,7 +164,6 @@
 - (void)deletePromptAction {
     [self.view endEditing:YES];
 
-    // Ekranın tam ortasında çıkan klasik Apple UIAlertControllerStyleAlert (Vazgeç / Sil)
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"prompt_delete_confirm_title")
                                                                    message:LocalizedString(@"prompt_delete_confirm_msg")
                                                             preferredStyle:UIAlertControllerStyleAlert];
