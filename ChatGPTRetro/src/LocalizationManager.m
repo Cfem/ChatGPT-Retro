@@ -100,7 +100,12 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"lang_tr": @"Türkçe",
         @"lang_en": @"English",
         @"instructions_placeholder": @"ChatGPT'nin sizi nasıl tanımasını istediğinizi ve bağlamı buraya yazın...",
-        @"instructions_footer": @"ChatGPT'nin sizi tanıması ve bağlamınızı hiç unutmamasını istediğiniz bilgileri buraya yazın. Tüm sohbetlerde otomatik uygulanır.",
+        @"instructions_footer": @"Aktif (işaretli) sistem talimatları tüm sohbetlere otomatik eklenir. İstediğinizi ekleyip çıkarabilir veya solundaki tiki kapatabilirsiniz.",
+        @"add_prompt_button": @"+ Yeni Talimat Ekle",
+        @"add_prompt_title": @"Yeni Sistem Talimatı",
+        @"edit_prompt_title": @"Talimatı Düzenle",
+        @"prompt_title_placeholder": @"Başlık (Örn: Tıp Fakültesi / Python Uzmanı)",
+        @"prompt_content_placeholder": @"Talimat içeriğini yazın...",
         @"welcome_msg": @"ChatGPT Retro'ya Hoş Geldiniz!\n\nBu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle doğrudan sohbet etmeniz için hazırlandı.\n\nSol üstteki 'Sohbetler' menüsünden geçmiş konuşmalarınıza ulaşabilir, sağ üstteki dişli simgesinden ayarları açabilirsiniz.",
         @"auth_prompt_title": @"Giriş Yapılması Gerekli",
         @"auth_prompt_msg": @"ChatGPT ile konuşabilmek için ChatGPT hesabınızla giriş yapabilir veya Ayarlar'dan API Anahtarı girebilirsiniz.",
@@ -130,7 +135,18 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"effort_medium": @"Orta (Medium)",
         @"effort_high": @"Yüksek (High)",
         @"effort_xhigh": @"Çok Yüksek (xHigh)",
-        @"effort_max": @"Maksimum (Max)"
+        @"effort_max": @"Maksimum (Max)",
+        @"section_advanced": @"İLERİ SEVİYE MALİYET VE HAFIZA AYARLARI",
+        @"advanced_footer": @"Bu ayarlar OpenAI API isteklerindeki girdi tokenlarını azaltarak harcamalarınızı ciddi oranda düşürür.",
+        @"adv_prompt_caching_title": @"Prompt Caching",
+        @"adv_prompt_caching_desc": @"Sistem talimatlarını ve geçmişi önbelleğe alarak OpenAI'ın %50-%80 indirimli tarifesini tetikler.",
+        @"adv_truncate_assistant_title": @"Asistan Yanıtlarını Kırp",
+        @"adv_truncate_assistant_desc": @"Geçmişteki uzun asistan mesajlarının orta kısmını kırparak gereksiz token gönderimini engeller.",
+        @"adv_token_counter_title": @"Geçmiş Tur Limiti",
+        @"adv_token_counter_desc": @"Modele gönderilecek geriye dönük mesaj sayısını sınırlar. Düşük değerler maliyeti önemli ölçüde azaltır.",
+        @"turns_count_format": @"Son %ld Mesaj",
+        @"adv_keyword_filtering_title": @"Anahtar Kelime Filtreleme",
+        @"adv_keyword_filtering_desc": @"Yeni sorunuzla ortak kelimeler içeren geçmiş mesajları seçer, ilgisiz turları göndermez."
     };
 
     _enDict = @{
@@ -170,7 +186,12 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"lang_tr": @"Türkçe",
         @"lang_en": @"English",
         @"instructions_placeholder": @"Tell ChatGPT what you want it to remember about you...",
-        @"instructions_footer": @"Information you want ChatGPT to remember across all conversations (name, background, preferred tone, etc.).",
+        @"instructions_footer": @"Active (checked) system instructions are automatically applied to all chats. You can add, edit, or uncheck them.",
+        @"add_prompt_button": @"+ Add New Instruction",
+        @"add_prompt_title": @"New System Instruction",
+        @"edit_prompt_title": @"Edit Instruction",
+        @"prompt_title_placeholder": @"Title (e.g., Medical Student / Python Expert)",
+        @"prompt_content_placeholder": @"Enter instruction text...",
         @"welcome_msg": @"Welcome to ChatGPT Retro!\n\nAdapted for iPad Mini 1 (iOS 8.4) to chat directly with OpenAI models.\n\nAccess past chats from the 'Chats' menu on the left, or open Settings via the gear icon on the right.",
         @"auth_prompt_title": @"Authentication Required",
         @"auth_prompt_msg": @"Please sign in with your ChatGPT account or enter an OpenAI API key in Settings to continue.",
@@ -200,7 +221,18 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"effort_medium": @"Medium",
         @"effort_high": @"High",
         @"effort_xhigh": @"xHigh",
-        @"effort_max": @"Max"
+        @"effort_max": @"Max",
+        @"section_advanced": @"ADVANCED COST & MEMORY SETTINGS",
+        @"advanced_footer": @"These settings reduce input tokens on OpenAI API requests to significantly lower your bill.",
+        @"adv_prompt_caching_title": @"Prompt Caching",
+        @"adv_prompt_caching_desc": @"Caches system instructions and history to trigger OpenAI's 50%-80% discounted cache tariff.",
+        @"adv_truncate_assistant_title": @"Truncate Assistant Responses",
+        @"adv_truncate_assistant_desc": @"Trims middle portions of past long assistant messages to prevent redundant token transfer.",
+        @"adv_token_counter_title": @"History Turns Limit",
+        @"adv_token_counter_desc": @"Restricts how many prior turns are sent to the model. Lower values save significant token costs.",
+        @"turns_count_format": @"Last %ld Turns",
+        @"adv_keyword_filtering_title": @"Keyword Filtering",
+        @"adv_keyword_filtering_desc": @"Picks past messages that share keywords with your new query, skipping unrelated turns."
     };
 }
 

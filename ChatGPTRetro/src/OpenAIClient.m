@@ -14,6 +14,7 @@ NSString *const kChatGPTAuthStateDidChangeNotification = @"ChatGPTAuthStateDidCh
 static NSString *const kOpenAIApiKeyDefaultsKey      = @"OpenAIClientApiKey";
 static NSString *const kOpenAIModelDefaultsKey       = @"OpenAIClientModel";
 static NSString *const kOpenAICustomInstructionKey   = @"OpenAIClientCustomInstruction";
+static NSString *const kOpenAISystemPromptsListKey   = @"OpenAIClientSystemPromptsList";
 static NSString *const kOpenAICachedModelsKey        = @"OpenAIClientCachedModels";
 
 // SIWC Storage Keys
@@ -103,6 +104,25 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         _selectedModel = [defaults stringForKey:kOpenAIModelDefaultsKey] ?: kDefaultModel;
         _customSystemInstruction = [defaults stringForKey:kOpenAICustomInstructionKey] ?: @"";
 
+        NSArray *savedPrompts = [defaults arrayForKey:kOpenAISystemPromptsListKey];
+        if (savedPrompts) {
+            _systemPromptsList = [NSMutableArray array];
+            for (NSDictionary *dict in savedPrompts) {
+                [_systemPromptsList addObject:[dict mutableCopy]];
+            }
+        } else {
+            _systemPromptsList = [NSMutableArray array];
+            // Eğer daha önceden kalan customSystemInstruction varsa bunu ilk prompt olarak aktaralım
+            if (_customSystemInstruction.length > 0) {
+                [_systemPromptsList addObject:[@{
+                    @"id": [[NSUUID UUID] UUIDString],
+                    @"title": @"Özel Talimatım",
+                    @"content": _customSystemInstruction,
+                    @"enabled": @YES
+                } mutableCopy]];
+            }
+        }
+
         if ([defaults objectForKey:@"OpenAI_ReasoningEffortLevel"] != nil) {
             _reasoningEffortLevel = [defaults integerForKey:@"OpenAI_ReasoningEffortLevel"];
         } else {
@@ -116,6 +136,12 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         } else {
             _modelTemperature = 0.7f;
         }
+
+        // Advanced Cost Optimizations
+        _enablePromptCaching = [defaults objectForKey:@"Adv_EnablePromptCaching"] ? [defaults boolForKey:@"Adv_EnablePromptCaching"] : YES;
+        _enableTruncateAssistant = [defaults boolForKey:@"Adv_EnableTruncateAssistant"];
+        _enableKeywordFiltering = [defaults boolForKey:@"Adv_EnableKeywordFiltering"];
+        _maxHistoryTurns = [defaults objectForKey:@"Adv_MaxHistoryTurns"] ? [defaults integerForKey:@"Adv_MaxHistoryTurns"] : 8;
 
         // 1. Prepare App's Host ID (urn:uuid:...) per SIWC DevKit spec
         _hostId = [defaults stringForKey:kSIWCHostIdKey];
@@ -137,6 +163,131 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     return self;
 }
 
+- (void)setEnablePromptCaching:(BOOL)enablePromptCaching {
+    _enablePromptCaching = enablePromptCaching;
+    [[NSUserDefaults standardUserDefaults] setBool:enablePromptCaching forKey:@"Adv_EnablePromptCaching"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setEnableTruncateAssistant:(BOOL)enableTruncateAssistant {
+    _enableTruncateAssistant = enableTruncateAssistant;
+    [[NSUserDefaults standardUserDefaults] setBool:enableTruncateAssistant forKey:@"Adv_EnableTruncateAssistant"];
+    if (enableTruncateAssistant) {
+        _enableKeywordFiltering = NO;
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"Adv_EnableKeywordFiltering"];
+    }
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setEnableKeywordFiltering:(BOOL)enableKeywordFiltering {
+    _enableKeywordFiltering = enableKeywordFiltering;
+    [[NSUserDefaults standardUserDefaults] setBool:enableKeywordFiltering forKey:@"Adv_EnableKeywordFiltering"];
+    if (enableKeywordFiltering) {
+        _enableTruncateAssistant = NO;
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"Adv_EnableTruncateAssistant"];
+    }
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setMaxHistoryTurns:(NSInteger)maxHistoryTurns {
+    if (maxHistoryTurns < 1) maxHistoryTurns = 1;
+    if (maxHistoryTurns > 20) maxHistoryTurns = 20;
+    _maxHistoryTurns = maxHistoryTurns;
+    [[NSUserDefaults standardUserDefaults] setInteger:maxHistoryTurns forKey:@"Adv_MaxHistoryTurns"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+#pragma mark - Context & Cost Optimization Helpers
+
+- (NSSet<NSString *> *)extractKeywordsFromString:(NSString *)text {
+    if (!text || text.length == 0) return [NSSet set];
+    NSCharacterSet *punctAndSpace = [NSCharacterSet characterSetWithCharactersInString:@" \t\r\n.,;:!?'\"()[]{}<>/\\|@#$%^&*-_+=`~"];
+    NSArray *words = [text componentsSeparatedByCharactersInSet:punctAndSpace];
+    NSMutableSet *keywords = [NSMutableSet set];
+    NSSet *stopWords = [NSSet setWithObjects:@"ve", @"ile", @"bir", @"bu", @"su", @"o", @"de", @"da", @"mi", @"mu", @"mü", @"icin", @"ama", @"fakat", @"gibi", @"kadar", @"the", @"and", @"is", @"in", @"to", @"of", @"it", @"that", @"you", @"was", @"for", @"on", @"are", @"as", @"with", @"at", @"be", @"this", @"have", @"from", nil];
+
+    for (NSString *w in words) {
+        NSString *cleaned = [[w lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (cleaned.length >= 3 && ![stopWords containsObject:cleaned]) {
+            [keywords addObject:cleaned];
+        }
+    }
+    return keywords;
+}
+
+- (NSString *)truncateAssistantMessage:(NSString *)text {
+    if (!text || text.length <= 400) return text;
+    // İlk 200 karakter + son 150 karakteri alarak aradaki uzun açıklamaları at
+    NSString *head = [text substringToIndex:200];
+    NSString *tail = [text substringFromIndex:text.length - 150];
+    return [NSString stringWithFormat:@"%@\n[...detaylar maliyet tasarrufu için kırpıldı...]\n%@", head, tail];
+}
+
+- (NSArray<NSDictionary *> *)prepareOptimizedHistoryMessages:(NSArray *)historyMessages currentPrompt:(NSString *)currentPrompt {
+    NSMutableArray<ChatMessage *> *filtered = [NSMutableArray array];
+    for (ChatMessage *msg in historyMessages) {
+        if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4"] || [msg.text isEqualToString:@"..."]) {
+            continue;
+        }
+        [filtered addObject:msg];
+    }
+
+    // 1. Sliding Window (Slider ile seçilen tur sayısı)
+    NSInteger turnsLimit = self.maxHistoryTurns > 0 ? self.maxHistoryTurns : 8;
+    NSInteger startIndex = 0;
+    if ((NSInteger)filtered.count > turnsLimit) {
+        startIndex = filtered.count - turnsLimit;
+    }
+
+    NSMutableArray<ChatMessage *> *windowedMessages = [NSMutableArray array];
+    for (NSInteger i = startIndex; i < (NSInteger)filtered.count; i++) {
+        [windowedMessages addObject:filtered[i]];
+    }
+
+    // 2. Anahtar Kelime Filtreleme (TF-IDF benzeri eşleşme)
+    if (self.enableKeywordFiltering && currentPrompt.length > 0) {
+        NSSet *promptKeywords = [self extractKeywordsFromString:currentPrompt];
+        NSMutableArray<ChatMessage *> *relevantMessages = [NSMutableArray array];
+
+        for (ChatMessage *msg in windowedMessages) {
+            NSSet *msgKeywords = [self extractKeywordsFromString:msg.text];
+            NSMutableSet *intersection = [promptKeywords mutableCopy];
+            [intersection intersectSet:msgKeywords];
+
+            // Kullanıcının mesajıysa veya ortak anahtar kelime barındırıyorsa tut
+            if (msg.sender == ChatMessageSenderUser || intersection.count > 0) {
+                [relevantMessages addObject:msg];
+            }
+        }
+        // Eğer hiçbir eşleşme çıkmadıysa son 2 mesajı bari koru
+        if (relevantMessages.count == 0 && windowedMessages.count > 0) {
+            NSInteger keep = MIN((NSInteger)windowedMessages.count, 2);
+            for (NSInteger i = windowedMessages.count - keep; i < (NSInteger)windowedMessages.count; i++) {
+                [relevantMessages addObject:windowedMessages[i]];
+            }
+        }
+        windowedMessages = relevantMessages;
+    }
+
+    // 3. Mesaj formatına dönüştürme ve (varsa) Asistan yanıtlarını kırpma
+    NSMutableArray *result = [NSMutableArray array];
+    for (ChatMessage *msg in windowedMessages) {
+        NSString *role = (msg.sender == ChatMessageSenderUser) ? @"user" : @"assistant";
+        NSString *body = msg.text ?: @"";
+
+        if (self.enableTruncateAssistant && msg.sender == ChatMessageSenderAssistant) {
+            body = [self truncateAssistantMessage:body];
+        }
+
+        [result addObject:@{
+            @"role": role,
+            @"content": body
+        }];
+    }
+
+    return result;
+}
+
 - (void)saveApiKey:(NSString *)apiKey {
     _apiKey = [apiKey stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
     [[NSUserDefaults standardUserDefaults] setObject:_apiKey forKey:kOpenAIApiKeyDefaultsKey];
@@ -154,6 +305,41 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     _customSystemInstruction = [instruction stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
     [[NSUserDefaults standardUserDefaults] setObject:_customSystemInstruction forKey:kOpenAICustomInstructionKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)saveSystemPromptsList:(NSArray *)prompts {
+    _systemPromptsList = [NSMutableArray array];
+    for (NSDictionary *dict in prompts) {
+        [_systemPromptsList addObject:[dict mutableCopy]];
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:_systemPromptsList forKey:kOpenAISystemPromptsListKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (NSString *)effectiveCombinedSystemInstructionWithWebSearch:(BOOL)webSearch {
+    NSMutableString *combined = [NSMutableString string];
+
+    // Kullanıcının sistem genelindeki aktif (tikli) talimatları ekleniyor
+    for (NSDictionary *promptDict in self.systemPromptsList) {
+        if ([promptDict[@"enabled"] boolValue]) {
+            NSString *content = [promptDict[@"content"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (content.length > 0) {
+                if (combined.length > 0) {
+                    [combined appendString:@"\n\n"];
+                }
+                [combined appendString:content];
+            }
+        }
+    }
+
+    if (webSearch) {
+        if (combined.length > 0) {
+            [combined appendString:@"\n\n"];
+        }
+        [combined appendString:@"Web araması aktif. En güncel bilgilere göre cevap ver ve kaynakları/tarihleri belirt."];
+    }
+
+    return combined;
 }
 
 - (void)setReasoningEffortLevel:(NSInteger)reasoningEffortLevel {
@@ -860,36 +1046,11 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     NSString *model = (self.selectedModel.length > 0) ? self.selectedModel : kDefaultModel;
     NSString *urlString = @"https://api.openai.com/v1/responses";
 
-    NSMutableString *instructions = [NSMutableString stringWithString:@"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."];
-    if (self.customSystemInstruction.length > 0) {
-        [instructions appendFormat:@"\n\n[Kullanıcı Özel Sistem Talimatı ve Tercihleri]:\n%@", self.customSystemInstruction];
-    }
-    if (webSearch) {
-        [instructions appendString:@" Web araması aktif. Güncel bilgileri ve kaynakları belirt."];
-    }
+    NSString *instructions = [self effectiveCombinedSystemInstructionWithWebSearch:webSearch];
 
-    NSMutableArray *inputMessages = [NSMutableArray array];
-    NSMutableArray *filteredHistory = [NSMutableArray array];
-    for (ChatMessage *msg in historyMessages) {
-        if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4"] || [msg.text isEqualToString:@"..."]) {
-            continue;
-        }
-        [filteredHistory addObject:msg];
-    }
-
-    NSInteger startIndex = 0;
-    if (filteredHistory.count > 8) {
-        startIndex = filteredHistory.count - 8;
-    }
-
-    for (NSInteger i = startIndex; i < filteredHistory.count; i++) {
-        ChatMessage *msg = filteredHistory[i];
-        NSString *role = (msg.sender == ChatMessageSenderUser) ? @"user" : @"assistant";
-        [inputMessages addObject:@{
-            @"role": role,
-            @"content": msg.text ?: @""
-        }];
-    }
+    // Optimize edilmiş geçmişi al (Sliding window + keyword filter + truncate assistant)
+    NSArray *optimizedHistory = [self prepareOptimizedHistoryMessages:historyMessages currentPrompt:prompt];
+    NSMutableArray *inputMessages = [NSMutableArray arrayWithArray:optimizedHistory];
 
     [inputMessages addObject:@{
         @"role": @"user",
@@ -899,7 +1060,9 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     NSMutableDictionary *payloadDict = [NSMutableDictionary dictionary];
     payloadDict[@"model"] = model;
     payloadDict[@"input"] = inputMessages;
-    payloadDict[@"instructions"] = instructions;
+    if (instructions.length > 0) {
+        payloadDict[@"instructions"] = instructions;
+    }
     payloadDict[@"store"] = @NO;
     payloadDict[@"stream"] = @YES;
 
@@ -1036,42 +1199,18 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     NSMutableArray *messages = [NSMutableArray array];
 
     NSString *instructionRole = isModern ? @"developer" : @"system";
-    NSMutableString *systemPrompt = [NSMutableString stringWithString:@"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."];
-    
-    if (self.customSystemInstruction.length > 0) {
-        [systemPrompt appendFormat:@"\n\n[Kullanıcı Özel Sistem Talimatı ve Tercihleri]:\n%@", self.customSystemInstruction];
-    }
+    NSString *systemPrompt = [self effectiveCombinedSystemInstructionWithWebSearch:webSearch];
 
-    if (webSearch) {
-        [systemPrompt appendString:@" Web araması (canlı internet bilgisi) aktif. En güncel bilgilere göre cevap ver ve kaynakları/tarihleri belirt."];
-    }
-
-    [messages addObject:@{
-        @"role": instructionRole,
-        @"content": systemPrompt
-    }];
-
-    NSMutableArray *filteredHistory = [NSMutableArray array];
-    for (ChatMessage *msg in historyMessages) {
-        if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4"] || [msg.text isEqualToString:@"..."]) {
-            continue;
-        }
-        [filteredHistory addObject:msg];
-    }
-
-    NSInteger startIndex = 0;
-    if (filteredHistory.count > 8) {
-        startIndex = filteredHistory.count - 8;
-    }
-
-    for (NSInteger i = startIndex; i < filteredHistory.count; i++) {
-        ChatMessage *msg = filteredHistory[i];
-        NSString *role = (msg.sender == ChatMessageSenderUser) ? @"user" : @"assistant";
+    if (systemPrompt.length > 0) {
         [messages addObject:@{
-            @"role": role,
-            @"content": msg.text ?: @""
+            @"role": instructionRole,
+            @"content": systemPrompt
         }];
     }
+
+    // Optimize edilmiş geçmişi al (Sliding window + keyword filter + truncate assistant)
+    NSArray *optimizedHistory = [self prepareOptimizedHistoryMessages:historyMessages currentPrompt:prompt];
+    [messages addObjectsFromArray:optimizedHistory];
 
     [messages addObject:@{
         @"role": @"user",

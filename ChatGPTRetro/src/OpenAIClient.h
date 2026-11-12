@@ -11,6 +11,7 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 @property (nonatomic, copy) NSString *apiKey;
 @property (nonatomic, copy) NSString *selectedModel;
 @property (nonatomic, copy) NSString *customSystemInstruction;
+@property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *systemPromptsList;
 
 // Model Capabilities & Extra Request Parameters (Per OpenAI Responses/Completions Docs)
 // reasoningEffortLevel: 0=none, 1=minimal, 2=low, 3=medium, 4=high, 5=xhigh, 6=max
@@ -19,6 +20,13 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 @property (nonatomic, assign) BOOL enableWebSearch;
 @property (nonatomic, assign) BOOL enableCodeInterpreter;
 @property (nonatomic, assign) float modelTemperature;
+
+// Advanced Cost & Context Optimizations
+@property (nonatomic, assign) BOOL enablePromptCaching;
+@property (nonatomic, assign) BOOL enableTruncateAssistant;
+@property (nonatomic, assign) BOOL enableKeywordFiltering;
+// maxHistoryTurns: 1..20 (varsayılan: 8)
+@property (nonatomic, assign) NSInteger maxHistoryTurns;
 
 // Sign in with ChatGPT (SIWC) OAuth 2.0 + PKCE Properties
 @property (nonatomic, copy, readonly) NSString *hostId;
@@ -34,6 +42,9 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 - (void)saveApiKey:(NSString *)apiKey;
 - (void)saveSelectedModel:(NSString *)model;
 - (void)saveCustomSystemInstruction:(NSString *)instruction;
+- (void)saveSystemPromptsList:(NSArray *)prompts;
+- (NSString *)effectiveCombinedSystemInstructionWithWebSearch:(BOOL)webSearch;
+- (NSArray<NSDictionary *> *)prepareOptimizedHistoryMessages:(NSArray *)historyMessages currentPrompt:(NSString *)currentPrompt;
 
 // Model Capability Inspection (Dynamic UI Helpers)
 - (BOOL)supportsReasoningEffortForModel:(NSString *)model;
