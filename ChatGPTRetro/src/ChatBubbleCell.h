@@ -4,7 +4,7 @@
 @interface ChatBubbleCell : UITableViewCell
 
 @property (nonatomic, strong) UIView *bubbleBackgroundView;
-@property (nonatomic, strong) UILabel *messageLabel;
+@property (nonatomic, strong) UITextView *messageTextView;
 @property (nonatomic, strong) ChatMessage *message;
 
 - (void)configureWithMessage:(ChatMessage *)message containerWidth:(CGFloat)width;
