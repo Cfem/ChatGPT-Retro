@@ -476,13 +476,8 @@
             cell.detailTextLabel.textColor = [UIColor grayColor];
             cell.detailTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
 
-            // Yaklaşım B: Sağ tarafta detay sayfasına giden sağa ok butonu
-            UIButton *arrowBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            arrowBtn.frame = CGRectMake(0, 0, 44, 44);
-            arrowBtn.tag = 1000 + indexPath.row;
-            [arrowBtn setImage:[self disclosureArrowImage] forState:UIControlStateNormal];
-            [arrowBtn addTarget:self action:@selector(instructionInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-            cell.accessoryView = arrowBtn;
+            // Sağa oku komple kaldır (Temiz minimalist Apple görünümü)
+            cell.accessoryView = nil;
             cell.accessoryType = UITableViewCellAccessoryNone;
         } else {
             // "+ Yeni Talimat Ekle" satırı
@@ -716,12 +711,22 @@
     if (indexPath.section == 2) {
         NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
         if (indexPath.row < count) {
+            // 1. Silme Aksiyonu (Kırmızı)
             UITableViewRowAction *deleteAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDestructive
                                                                                     title:LocalizedString(@"delete_button")
                                                                                   handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
                 [self confirmAndDeletePromptAtIndexPath:ip];
             }];
-            return @[deleteAction];
+
+            // 2. Düzenle Aksiyonu (Mavi Apple Stili) -> Sağa giden düzenleme sayfasını açar
+            UITableViewRowAction *editAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleNormal
+                                                                                  title:LocalizedString(@"edit_prompt_title")
+                                                                                handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
+                [self openInstructionDetailAtIndex:ip.row];
+            }];
+            editAction.backgroundColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.8 alpha:1.0];
+
+            return @[deleteAction, editAction];
         }
     }
     return nil;
