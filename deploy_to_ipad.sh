@@ -15,13 +15,14 @@ fi
 APP_DIR=$(dirname "$APP_PATH")
 APP_NAME=$(basename "$APP_PATH")
 
-echo "==> 1/3: $APP_NAME iPad'e aktarılıyor ($IPAD_IP)..."
+echo "==> 1/3: $APP_NAME iPad'e kopyalanıyor (/Applications)..."
+ssh $SSH_OPTS root@$IPAD_IP "rm -rf /var/mobile/Containers/Bundle/Application/ChatGPTRetro 2>/dev/null || true"
 tar --no-xattrs -C "$APP_DIR" -cf - "$APP_NAME" | ssh $SSH_OPTS root@$IPAD_IP "rm -rf /Applications/$APP_NAME && tar -C /Applications -xf - && chown -R mobile:staff /Applications/$APP_NAME && chmod -R 755 /Applications/$APP_NAME"
 
-echo "==> 2/3: SpringBoard ikonu güncelleniyor (uicache)..."
+echo "==> 2/3: SpringBoard önbelleği yenileniyor (uicache)..."
 ssh $SSH_OPTS root@$IPAD_IP "uicache"
 
 echo "==> 3/3: Uygulama iPad ekranında başlatılıyor ($BUNDLE_ID)..."
-ssh $SSH_OPTS root@$IPAD_IP "open $BUNDLE_ID"
+ssh $SSH_OPTS root@$IPAD_IP "killall -9 $APP_NAME 2>/dev/null || true; open $BUNDLE_ID"
 
 echo "==> [TAMAMLANDI] $APP_NAME başarıyla iPad Mini ekranında açıldı!"
