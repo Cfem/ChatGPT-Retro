@@ -15,4 +15,7 @@ typedef NS_ENUM(NSInteger, ChatMessageSender) {
 
 + (instancetype)messageWithText:(NSString *)text sender:(ChatMessageSender)sender;
 
+- (NSDictionary *)dictionaryRepresentation;
++ (instancetype)messageFromDictionary:(NSDictionary *)dict;
+
 @end

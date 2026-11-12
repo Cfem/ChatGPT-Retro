@@ -5,6 +5,8 @@
 #import "SettingsViewController.h"
 #import "ChatGPTLoginModalViewController.h"
 
+static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages";
+
 @interface ChatViewController () <SettingsViewControllerDelegate, ChatGPTLoginModalDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
@@ -54,7 +56,10 @@
                                                  name:kChatGPTAuthStateDidChangeNotification
                                                object:nil];
 
-    [self addWelcomeMessageIfNeeded];
+    [self loadSavedMessages];
+    if (self.messages.count == 0) {
+        [self addWelcomeMessageIfNeeded];
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -208,6 +213,45 @@
     }
 }
 
+- (void)saveLast10Messages {
+    NSMutableArray *toSave = [NSMutableArray array];
+    // Hoş geldiniz mesajını hariç tutarak gerçek sohbetleri filtrele
+    NSMutableArray *realMessages = [NSMutableArray array];
+    for (ChatMessage *msg in self.messages) {
+        if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4)"]) continue;
+        [realMessages addObject:msg];
+    }
+
+    NSInteger startIdx = 0;
+    if (realMessages.count > 10) {
+        startIdx = realMessages.count - 10;
+    }
+
+    for (NSInteger i = startIdx; i < realMessages.count; i++) {
+        ChatMessage *msg = realMessages[i];
+        [toSave addObject:[msg dictionaryRepresentation]];
+    }
+
+    [[NSUserDefaults standardUserDefaults] setObject:toSave forKey:kSavedChatMessagesKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)loadSavedMessages {
+    NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kSavedChatMessagesKey];
+    if (saved && [saved isKindOfClass:[NSArray class]] && saved.count > 0) {
+        for (NSDictionary *dict in saved) {
+            ChatMessage *msg = [ChatMessage messageFromDictionary:dict];
+            if (msg) {
+                [self.messages addObject:msg];
+            }
+        }
+        [self.tableView reloadData];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self scrollToBottomAnimated:NO];
+        });
+    }
+}
+
 - (void)addWelcomeMessageIfNeeded {
     NSString *welcome = @"👋 ChatGPT Retro'ya Hoş Geldiniz!\n\n"
                         @"Bu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle (GPT-4o, GPT-6 Luna vb.) doğrudan sohbet etmeniz için uyarlandı.\n\n"
@@ -222,6 +266,8 @@
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Temizle" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         [self.messages removeAllObjects];
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:kSavedChatMessagesKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
         [self addWelcomeMessageIfNeeded];
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
@@ -297,6 +343,7 @@
 
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
+    [self saveLast10Messages];
 
     [self.tableView reloadData];
     [self scrollToBottomAnimated:YES];
@@ -323,6 +370,7 @@
             [self.messages addObject:assistantChat];
         }
 
+        [self saveLast10Messages];
         [self.tableView reloadData];
         [self scrollToBottomAnimated:YES];
     }];
