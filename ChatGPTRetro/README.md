@@ -1,62 +1,72 @@
-# RetroGemini iOS 8 (iPad Mini 1 Client)
+# ChatGPT Retro
 
-RetroGemini, Apple A5 çipli ve 512 MB RAM'e sahip **iPad Mini 1 (iOS 8.4)** cihazlar için özel olarak tasarlanmış, ultra hafif ve optimize edilmiş modern bir **Google Gemini AI** istemcisidir.
+A lightweight ChatGPT client designed for legacy iOS devices (iOS 8+).
 
-![Target](https://img.shields.io/badge/Target-iOS%208.4%20(iPad%20Mini%201)-blue)
-![Architecture](https://img.shields.io/badge/Arch-armv7%20(32--bit)-orange)
-![Size](https://img.shields.io/badge/Size-33%20KB%20(.ipa)-green)
+> **Developer Note:** This project was developed without prior coding knowledge, built entirely with the assistance of Artificial Intelligence (AI pair-programming). It was primarily built and tested on an iPad tablet; iPhone compatibility is implemented but has not been extensively tested.
 
 ---
 
-## 🌟 Özellikler
+## Features
 
-1. **Modern Gemini Modelleri:**
-   - `gemini-1.5-flash` (Hızlı, akıllı ve önerilen varsayılan model)
-   - `gemini-1.5-flash-8b` (512 MB RAM ve düşük gecikme için ultra hafif model)
-   - `gemini-1.5-pro` (Kapsamlı mantıksal sorgular için)
-
-2. **Dönemin Orijinal iOS 8 Tasarım Dili:**
-   - iMessage tarzı yuvarlatılmış konuşma balonları (Kullanıcı için iOS 8 Mavisi `#007AFF`, Gemini için Açık Gri `#E5E5EA`).
-   - Yarı saydam (translucent) üst navigasyon çubuğu ve ince sınır çizgileri (0.5pt single-pixel separator).
-   - `HelveticaNeue` tipografisi.
-   - Klavyeyle tam senkronize hareket eden yumuşak yay animasyonlu giriş çubuğu.
-
-3. **512 MB RAM ve Apple A5 İçin Ekstrem Optimizasyon:**
-   - **Sıfır WebView:** Bellek katili olan UIWebView / WKWebView yerine %100 yerel UIKit ve TextKit.
-   - **Manuel Frame Layout:** A5 işlemciye yük bindiren AutoLayout yerine el ile hesaplanan ultra hızlı frame yerleşimi (60 FPS kaydırma).
-   - **Hücre Yüksekliği Önbellekleme (Height Caching):** Mesaj yükseklikleri bir kez hesaplanır, tekrar render edilmez.
-   - **Bağlam Limiti (Context Pruning):** Belleği korumak için sadece son konuşma geçmişi API'ye iletilir.
-
-4. **Doğrudan Google AI Studio Entegrasyonu:**
-   - Ücretli abonelik veya kredi kartı gerektirmeden, [Google AI Studio](https://aistudio.google.com/) üzerinden alınan ücretsiz API Key ile çalışır.
-   - Anahtar cihazın yerel `NSUserDefaults` deposunda saklanır.
+- **Up-to-Date Model Support** (with live model fetching)
+- **iOS 8+ Compatibility** (including 32-bit armv7 architecture)
+- **Lightweight Native UI** (~1.1 MB app size, built with pure UIKit and Objective-C)
+- **Custom System Instructions & Memory**
+- **Reasoning Effort & Model Parameter Controls** (Temperature, Web Search, Code Interpreter)
+- **Token & Cost Optimizations** (Prompt Caching, Assistant Response Truncation, History Turn Limiting)
+- **Dual Authentication Modes** (OpenAI API Key & QR-assisted Sign-in)
 
 ---
 
-## 📲 iPad Mini 1'e Kurulum (.IPA Yükleme)
+## Authentication & Setup
 
-Cihazınız jailbreakli olduğu için `GeminiRetro.ipa` dosyasını kurmak çok kolaydır:
+You can use the application through one of the two supported authentication methods:
 
-### Yöntem 1: Filza File Manager ile (Doğrudan iPad üzerinden)
-1. `GeminiRetro.ipa` dosyasını AirDrop, Google Drive veya yerel ağ üzerinden iPad'e aktarın.
-2. iPad'inizdeki **Filza** uygulamasını açın.
-3. `GeminiRetro.ipa` dosyasına dokunun ve sağ üstteki **"Yükle" (Install)** butonuna basın.
-4. Kurulum saniyeler içinde tamamlanır ve ana ekrana **Gemini** ikonu gelir.
+### Method 1: OpenAI API Key (Recommended)
 
-### Yöntem 2: Sideloadly veya Apple Configurator / 3uTools ile (Mac/PC üzerinden)
-1. iPad'inizi kabloyla bilgisayarınıza bağlayın.
-2. Sideloadly veya 3uTools açıp `GeminiRetro.ipa` dosyasını sürükleyip bırakın ve yükleyin.
+Direct and stable connection using your personal OpenAI API key.
 
-*(Not: Cihazınızda Cydia'dan **AppSync Unified** tweak'inin kurulu olduğundan emin olun).*
+1. Go to [platform.openai.com](https://platform.openai.com) and create or log in to your account.
+2. Navigate to **Settings > Billing** and add credits to your balance (a minimum payment of $5 is typically sufficient for extended usage; note that ChatGPT Plus subscriptions do not cover API credits).
+3. Under the **API Keys** section, click `Create new secret key` and copy your key starting with `sk-...`.
+4. Open the app on your device, navigate to **Settings > Account & Login Settings**, and enter your API key.
 
 ---
 
-## 🛠️ Yeniden Derleme (Build from Source)
+### Method 2: QR Code Login via Modern Device (Experimental / SIWC)
 
-Tüm ortam ve araçlar proje klasörüne lokal olarak kurulmuştur. Yeniden derlemek için sadece şu komutu çalıştırmanız yeterlidir:
+> **Notice:** This method is implemented but has not been thoroughly tested across different device environments.
+
+**Why is this required?**
+Legacy Mobile Safari on iOS 8 does not support modern web standards, modern TLS handshakes, or Cloudflare verification challenges, making it impossible to directly load OpenAI's modern login page on the device itself.
+
+**How it works:**
+1. Selecting **Continue with ChatGPT** initializes a local loopback socket (Port 8787) on the device and generates a PKCE-compliant OAuth authorization QR code.
+2. Scan the QR code using a secondary modern smartphone (iPhone or Android) with a contemporary camera and browser.
+3. Complete the authentication on the smartphone. The resulting redirect callback URL is then transmitted back to the legacy device (or pasted manually) to establish the session.
+
+---
+
+## Installation
+
+- **Jailbroken Devices:** If your device has `AppSync Unified` installed, transfer and install `ChatGPTRetro.ipa` directly using Filza, iFunBox, or Apple Configurator.
+- **Non-Jailbroken Devices:** Sideload `ChatGPTRetro.ipa` using tools such as Sideloadly or AltStore with your free Apple ID.
+
+---
+
+## Building from Source
+
+Requirements:
+- macOS with [Theos](https://theos.dev) installed
+- `iPhoneOS9.3.sdk` (or iOS 8-compatible SDK)
 
 ```bash
-make ipa
+cd ChatGPTRetro
+make clean && make ipa
 ```
 
-Derleme tamamlandığında dizinde doğrudan `GeminiRetro.ipa` oluşacaktır.
+---
+
+## Disclaimer
+
+This project is an independent open-source software and is not affiliated with, endorsed by, or sponsored by OpenAI. OpenAI and ChatGPT are trademarks of OpenAI, Inc.
