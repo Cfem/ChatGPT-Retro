@@ -30,6 +30,7 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 
 // SIWC Direct Browser / Safari OAuth Methods
 - (void)startSignInWithChatGPTInSafariWithCompletion:(OpenAISignInHandler)completion;
+- (NSString *)prepareOAuthAuthorizationURL;
 - (NSString *)currentAuthorizationURL;
 - (void)handleIncomingCallbackURLString:(NSString *)urlString completion:(OpenAISignInHandler)completion;
 - (void)disconnectChatGPTAccountWithCompletion:(void (^)(void))completion;

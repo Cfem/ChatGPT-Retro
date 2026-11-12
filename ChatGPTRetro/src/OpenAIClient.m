@@ -218,9 +218,8 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     }
 }
 
-- (void)startSignInWithChatGPTInSafariWithCompletion:(OpenAISignInHandler)completion {
+- (NSString *)prepareOAuthAuthorizationURL {
     [self stopLoopbackListener];
-    self.pendingSignInCompletion = completion;
 
     // Generate fresh state, nonce, and PKCE values
     self.pendingState = [self generateRandomBase64UrlToken];
@@ -228,13 +227,13 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     self.pendingCodeVerifier = [self generateRandomBase64UrlToken];
     NSString *codeChallenge = [self sha256Base64Url:self.pendingCodeVerifier];
 
-    // Start background task so iOS 8 keeps our 127.0.0.1 callback server alive while Safari is in foreground
+    // Start background task so iOS 8 keeps our loopback callback server alive
     UIApplication *app = [UIApplication sharedApplication];
     self.bgTask = [app beginBackgroundTaskWithExpirationHandler:^{
         [self stopLoopbackListener];
     }];
 
-    // Bind 127.0.0.1 loopback server on port 8787
+    // Bind server on port 8787 (INADDR_ANY 0.0.0.0 so both 127.0.0.1 and Wi-Fi LAN IP can access)
     int serverFD = socket(AF_INET, SOCK_STREAM, 0);
     int opt = 1;
     setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -242,7 +241,7 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons(kSIWCRedirectPort);
 
     NSInteger boundPort = kSIWCRedirectPort;
@@ -336,6 +335,13 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         }
         [self stopLoopbackListener];
     });
+
+    return authUrl;
+}
+
+- (void)startSignInWithChatGPTInSafariWithCompletion:(OpenAISignInHandler)completion {
+    self.pendingSignInCompletion = completion;
+    NSString *authUrl = [self prepareOAuthAuthorizationURL];
 
     // Open Safari directly with the authorization URL
     NSURL *safariURL = [NSURL URLWithString:authUrl];
