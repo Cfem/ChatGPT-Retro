@@ -12,6 +12,13 @@
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray *messages;
 
+// Slide-out Drawer / Sidebar Properties
+@property (nonatomic, strong) ChatHistorySidebarViewController *sidebarVC;
+@property (nonatomic, strong) UINavigationController *sidebarNavController;
+@property (nonatomic, strong) UIView *sidebarContainerView;
+@property (nonatomic, strong) UIView *dimmingOverlayView;
+@property (nonatomic, assign) BOOL isSidebarOpen;
+
 // Giriş çubuğu bileşenleri
 @property (nonatomic, strong) UIView *inputContainerView;
 @property (nonatomic, strong) UIButton *webSearchButton;
@@ -45,6 +52,7 @@
     [self setupTableView];
     [self setupInputBar];
     [self registerKeyboardNotifications];
+    [self setupSidebarGestures];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(userDefaultsDidChange:)
@@ -84,18 +92,11 @@
 }
 
 - (void)setupNavigationItems {
-    // Sol: Sohbet Geçmişi / Sidebar Butonu
-    UIBarButtonItem *sidebarBtn = [[UIBarButtonItem alloc] initWithTitle:@"☰ Sohbetler"
-                                                                   style:UIBarButtonItemStylePlain
-                                                                  target:self
-                                                                  action:@selector(openSidebarTapped)];
-
-    UIBarButtonItem *clearBtn = [[UIBarButtonItem alloc] initWithTitle:@"Temizle"
-                                                                 style:UIBarButtonItemStylePlain
-                                                                target:self
-                                                                action:@selector(clearChatTapped)];
-
-    self.navigationItem.leftBarButtonItems = @[sidebarBtn, clearBtn];
+    // Sol: Sadece "☰ Sohbetler" Butonu (Temizle kaldırıldı)
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"☰ Sohbetler"
+                                                                             style:UIBarButtonItemStylePlain
+                                                                            target:self
+                                                                            action:@selector(toggleSidebar)];
 
     // Sağ: Yeni Sohbet (+) ve Ayarlar Butonları
     UIBarButtonItem *settingsBtn = [[UIBarButtonItem alloc] initWithTitle:@"Ayarlar"
@@ -110,28 +111,161 @@
     self.navigationItem.rightBarButtonItems = @[settingsBtn, newChatBtn];
 }
 
+#pragma mark - Sidebar Setup & Gestures
+
+- (CGFloat)sidebarWidth {
+    CGFloat screenW = self.view.window.bounds.size.width;
+    if (screenW <= 0) screenW = self.view.bounds.size.width;
+    // iOS 8 iPad için ideal kenar çekmecesi genişliği: 320pt
+    CGFloat w = 320.0;
+    if (screenW > 0 && w > screenW * 0.8) w = screenW * 0.8;
+    return w;
+}
+
+- (void)setupSidebarGestures {
+    // Ekranın sol kenarından sağa kaydırarak açma (Screen Edge Swipe)
+    UIScreenEdgePanGestureRecognizer *edgeSwipe = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(handleScreenEdgePan:)];
+    edgeSwipe.edges = UIRectEdgeLeft;
+    [self.view addGestureRecognizer:edgeSwipe];
+}
+
+- (void)handleScreenEdgePan:(UIScreenEdgePanGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan && !self.isSidebarOpen) {
+        [self openSidebarAnimated:YES];
+    }
+}
+
+- (void)ensureSidebarViews {
+    if (self.sidebarContainerView) return;
+
+    UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+    CGRect winBounds = targetWindow.bounds;
+    CGFloat sWidth = [self sidebarWidth];
+
+    // 1. Arka planı karartan ve dokununca kapatan Dimming Overlay
+    _dimmingOverlayView = [[UIView alloc] initWithFrame:winBounds];
+    _dimmingOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    _dimmingOverlayView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
+    _dimmingOverlayView.alpha = 0.0;
+
+    UITapGestureRecognizer *tapToClose = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(closeSidebar)];
+    [_dimmingOverlayView addGestureRecognizer:tapToClose];
+
+    // 2. Sidebar Sütunu (Tam Yükseklik)
+    _sidebarContainerView = [[UIView alloc] initWithFrame:CGRectMake(-sWidth, 0, sWidth, winBounds.size.height)];
+    _sidebarContainerView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleRightMargin;
+    _sidebarContainerView.backgroundColor = [UIColor whiteColor];
+
+    // iOS 8 Stil Gölge (Derinlik efekti)
+    _sidebarContainerView.layer.shadowColor = [UIColor blackColor].CGColor;
+    _sidebarContainerView.layer.shadowOpacity = 0.35;
+    _sidebarContainerView.layer.shadowRadius = 8.0;
+    _sidebarContainerView.layer.shadowOffset = CGSizeMake(3.0, 0);
+
+    // Sidebar View Controller'ı bağla
+    _sidebarVC = [[ChatHistorySidebarViewController alloc] init];
+    _sidebarVC.delegate = self;
+    _sidebarNavController = [[UINavigationController alloc] initWithRootViewController:_sidebarVC];
+    _sidebarNavController.view.frame = _sidebarContainerView.bounds;
+    _sidebarNavController.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+    [_sidebarContainerView addSubview:_sidebarNavController.view];
+
+    // Sola kaydırınca kapatma (Swipe Left on Sidebar)
+    UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(closeSidebar)];
+    swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
+    [_sidebarContainerView addGestureRecognizer:swipeLeft];
+
+    // Dimming overlay'e de sola kaydırma ekle
+    UISwipeGestureRecognizer *dimSwipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(closeSidebar)];
+    dimSwipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
+    [_dimmingOverlayView addGestureRecognizer:dimSwipeLeft];
+
+    [targetWindow addSubview:_dimmingOverlayView];
+    [targetWindow addSubview:_sidebarContainerView];
+}
+
+- (void)toggleSidebar {
+    if (self.isSidebarOpen) {
+        [self closeSidebar];
+    } else {
+        [self openSidebarAnimated:YES];
+    }
+}
+
+- (void)openSidebarAnimated:(BOOL)animated {
+    [self.view endEditing:YES];
+    [self ensureSidebarViews];
+    [self.sidebarVC reloadHistory];
+
+    UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+    CGRect winBounds = targetWindow.bounds;
+    CGFloat sWidth = [self sidebarWidth];
+
+    self.dimmingOverlayView.frame = winBounds;
+    self.sidebarContainerView.frame = CGRectMake(-sWidth, 0, sWidth, winBounds.size.height);
+    self.dimmingOverlayView.hidden = NO;
+
+    void (^animations)(void) = ^{
+        self.dimmingOverlayView.alpha = 1.0;
+        self.sidebarContainerView.frame = CGRectMake(0, 0, sWidth, winBounds.size.height);
+    };
+
+    void (^completion)(BOOL) = ^(BOOL finished) {
+        self.isSidebarOpen = YES;
+    };
+
+    if (animated) {
+        [UIView animateWithDuration:0.28 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:animations completion:completion];
+    } else {
+        animations();
+        completion(YES);
+    }
+}
+
+- (void)closeSidebar {
+    [self closeSidebarWithCompletion:nil];
+}
+
+- (void)closeSidebarWithCompletion:(void (^)(void))onComplete {
+    if (!self.isSidebarOpen && self.sidebarContainerView.frame.origin.x < 0) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    CGFloat sWidth = [self sidebarWidth];
+    CGRect currentFrame = self.sidebarContainerView.frame;
+
+    [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+        self.dimmingOverlayView.alpha = 0.0;
+        self.sidebarContainerView.frame = CGRectMake(-sWidth, currentFrame.origin.y, sWidth, currentFrame.size.height);
+    } completion:^(BOOL finished) {
+        self.isSidebarOpen = NO;
+        self.dimmingOverlayView.hidden = YES;
+        if (onComplete) onComplete();
+    }];
+}
+
 - (void)openSidebarTapped {
-    ChatHistorySidebarViewController *sidebar = [[ChatHistorySidebarViewController alloc] init];
-    sidebar.delegate = self;
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:sidebar];
-    nav.modalPresentationStyle = UIModalPresentationFormSheet;
-    [self presentViewController:nav animated:YES completion:nil];
+    [self toggleSidebar];
 }
 
 - (void)newChatTapped {
-    ChatSession *newSession = [[ChatHistoryManager sharedManager] createNewSession];
-    [self loadSession:newSession];
+    [self closeSidebarWithCompletion:^{
+        ChatSession *newSession = [[ChatHistoryManager sharedManager] createNewSession];
+        [self loadSession:newSession];
+    }];
 }
 
 #pragma mark - ChatHistorySidebarDelegate
 
 - (void)sidebarDidSelectSession:(ChatSession *)session {
     [self loadSession:session];
-    [self dismissViewControllerAnimated:YES completion:nil];
+    [self closeSidebar];
 }
 
 - (void)sidebarDidRequestNewChat {
-    [self dismissViewControllerAnimated:YES completion:^{
+    [self closeSidebarWithCompletion:^{
         [self newChatTapped];
     }];
 }
