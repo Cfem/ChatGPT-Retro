@@ -202,6 +202,7 @@
         _dimmingOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _dimmingOverlayView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
         _dimmingOverlayView.alpha = 0.0;
+        _dimmingOverlayView.hidden = YES;
 
         UITapGestureRecognizer *tapToClose = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDimmingOverlayTap)];
         [_dimmingOverlayView addGestureRecognizer:tapToClose];
@@ -213,12 +214,12 @@
     _sidebarContainerView = [[UIView alloc] initWithFrame:CGRectMake(-sWidth, 0, sWidth, winBounds.size.height)];
     _sidebarContainerView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleRightMargin;
     _sidebarContainerView.backgroundColor = [UIColor whiteColor];
+    _sidebarContainerView.hidden = YES;
 
-    // iOS 8 Stil Gölge (Derinlik efekti)
-    _sidebarContainerView.layer.shadowColor = [UIColor blackColor].CGColor;
-    _sidebarContainerView.layer.shadowOpacity = 0.35;
-    _sidebarContainerView.layer.shadowRadius = 8.0;
-    _sidebarContainerView.layer.shadowOffset = CGSizeMake(3.0, 0);
+    // 1px sağ sınır çizgisi (Dinamik gölge yerine 60 FPS akıcılık ve kenar karartmasını önlemek için)
+    UIView *rightBorder = [[UIView alloc] initWithFrame:CGRectMake(sWidth - 0.5, 0, 0.5, winBounds.size.height)];
+    rightBorder.backgroundColor = [UIColor colorWithWhite:0.75 alpha:1.0];
+    rightBorder.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleLeftMargin;
 
     // Sidebar View Controller'ı bağla
     _sidebarVC = [[ChatHistorySidebarViewController alloc] init];
@@ -228,6 +229,7 @@
     _sidebarNavController.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
     [_sidebarContainerView addSubview:_sidebarNavController.view];
+    [_sidebarContainerView addSubview:rightBorder];
 
     // Sola kaydırınca kapatma (Swipe Left on Sidebar)
     UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(closeSidebar)];
@@ -250,6 +252,7 @@
         _dimmingOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _dimmingOverlayView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
         _dimmingOverlayView.alpha = 0.0;
+        _dimmingOverlayView.hidden = YES;
 
         UITapGestureRecognizer *tapToClose = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDimmingOverlayTap)];
         [_dimmingOverlayView addGestureRecognizer:tapToClose];
@@ -261,11 +264,12 @@
     _settingsContainerView = [[UIView alloc] initWithFrame:CGRectMake(winBounds.size.width, 0, setWidth, winBounds.size.height)];
     _settingsContainerView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleLeftMargin;
     _settingsContainerView.backgroundColor = [UIColor whiteColor];
+    _settingsContainerView.hidden = YES;
 
-    _settingsContainerView.layer.shadowColor = [UIColor blackColor].CGColor;
-    _settingsContainerView.layer.shadowOpacity = 0.35;
-    _settingsContainerView.layer.shadowRadius = 8.0;
-    _settingsContainerView.layer.shadowOffset = CGSizeMake(-3.0, 0);
+    // 1px sol sınır çizgisi (Dinamik gölge yerine 60 FPS akıcılık ve kenar karartmasını önlemek için)
+    UIView *leftBorder = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0.5, winBounds.size.height)];
+    leftBorder.backgroundColor = [UIColor colorWithWhite:0.75 alpha:1.0];
+    leftBorder.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleRightMargin;
 
     _settingsVC = [[SettingsViewController alloc] init];
     _settingsVC.delegate = self;
@@ -274,6 +278,7 @@
     _settingsNavController.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
     [_settingsContainerView addSubview:_settingsNavController.view];
+    [_settingsContainerView addSubview:leftBorder];
 
     // Sağa kaydırınca kapatma (Swipe Right on Settings)
     UISwipeGestureRecognizer *swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(closeSettings)];
@@ -315,6 +320,7 @@
     self.dimmingOverlayView.frame = winBounds;
     self.sidebarContainerView.frame = CGRectMake(-sWidth, 0, sWidth, winBounds.size.height);
     self.dimmingOverlayView.hidden = NO;
+    self.sidebarContainerView.hidden = NO;
 
     void (^animations)(void) = ^{
         self.dimmingOverlayView.alpha = 1.0;
@@ -326,7 +332,7 @@
     };
 
     if (animated) {
-        [UIView animateWithDuration:0.28 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:animations completion:completion];
+        [UIView animateWithDuration:0.25 delay:0 options:(7 << 16) | UIViewAnimationOptionBeginFromCurrentState animations:animations completion:completion];
     } else {
         animations();
         completion(YES);
@@ -338,7 +344,7 @@
 }
 
 - (void)closeSidebarWithCompletion:(void (^)(void))onComplete {
-    if (!self.isSidebarOpen && self.sidebarContainerView.frame.origin.x < 0) {
+    if (!self.isSidebarOpen && self.sidebarContainerView.hidden) {
         if (onComplete) onComplete();
         return;
     }
@@ -346,12 +352,17 @@
     CGFloat sWidth = [self sidebarWidth];
     CGRect currentFrame = self.sidebarContainerView.frame;
 
-    [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
-        self.dimmingOverlayView.alpha = 0.0;
+    [UIView animateWithDuration:0.22 delay:0 options:(7 << 16) | UIViewAnimationOptionBeginFromCurrentState animations:^{
+        if (!self.isSettingsOpen) {
+            self.dimmingOverlayView.alpha = 0.0;
+        }
         self.sidebarContainerView.frame = CGRectMake(-sWidth, currentFrame.origin.y, sWidth, currentFrame.size.height);
     } completion:^(BOOL finished) {
         self.isSidebarOpen = NO;
-        self.dimmingOverlayView.hidden = YES;
+        self.sidebarContainerView.hidden = YES;
+        if (!self.isSettingsOpen) {
+            self.dimmingOverlayView.hidden = YES;
+        }
         if (onComplete) onComplete();
     }];
 }
@@ -408,6 +419,7 @@
     self.dimmingOverlayView.frame = winBounds;
     self.settingsContainerView.frame = CGRectMake(winBounds.size.width, 0, setWidth, winBounds.size.height);
     self.dimmingOverlayView.hidden = NO;
+    self.settingsContainerView.hidden = NO;
 
     void (^animations)(void) = ^{
         self.dimmingOverlayView.alpha = 1.0;
@@ -419,7 +431,7 @@
     };
 
     if (animated) {
-        [UIView animateWithDuration:0.28 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:animations completion:completion];
+        [UIView animateWithDuration:0.25 delay:0 options:(7 << 16) | UIViewAnimationOptionBeginFromCurrentState animations:animations completion:completion];
     } else {
         animations();
         completion(YES);
@@ -431,7 +443,7 @@
 }
 
 - (void)closeSettingsWithCompletion:(void (^)(void))onComplete {
-    if (!self.isSettingsOpen && self.settingsContainerView.frame.origin.x >= self.view.window.bounds.size.width) {
+    if (!self.isSettingsOpen && self.settingsContainerView.hidden) {
         if (onComplete) onComplete();
         return;
     }
@@ -440,13 +452,14 @@
     CGRect winBounds = targetWindow.bounds;
     CGFloat setWidth = [self settingsWidth];
 
-    [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+    [UIView animateWithDuration:0.22 delay:0 options:(7 << 16) | UIViewAnimationOptionBeginFromCurrentState animations:^{
         if (!self.isSidebarOpen) {
             self.dimmingOverlayView.alpha = 0.0;
         }
         self.settingsContainerView.frame = CGRectMake(winBounds.size.width, 0, setWidth, winBounds.size.height);
     } completion:^(BOOL finished) {
         self.isSettingsOpen = NO;
+        self.settingsContainerView.hidden = YES;
         if (!self.isSidebarOpen) {
             self.dimmingOverlayView.hidden = YES;
         }
@@ -464,6 +477,10 @@
 
 - (void)settingsDidUpdate {
     [self updateTitleWithModel];
+}
+
+- (void)settingsDidRequestClose {
+    [self closeSettings];
 }
 
 - (void)setupTableView {
