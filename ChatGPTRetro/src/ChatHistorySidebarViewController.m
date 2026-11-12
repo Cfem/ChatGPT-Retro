@@ -138,9 +138,10 @@
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         [[ChatHistoryManager sharedManager] deleteSessionAtIndex:indexPath.row];
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
-        if ([self.delegate respondsToSelector:@selector(sidebarDidSelectSession:)]) {
-            [self.delegate sidebarDidSelectSession:[ChatHistoryManager sharedManager].activeSession];
+        [tableView reloadData];
+        // Sadece arka plandaki aktif sohbeti güncelle, sidebar'ı kapatma!
+        if ([self.delegate respondsToSelector:@selector(sidebarDidDeleteSession:)]) {
+            [self.delegate sidebarDidDeleteSession:[ChatHistoryManager sharedManager].activeSession];
         }
     }
 }
