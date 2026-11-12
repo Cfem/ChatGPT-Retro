@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>bundleDisplayName</key>
+    <string>Gemini</string>
+    <key>bundleShortVersionString</key>
+    <string>2.6</string>
+    <key>bundleVersion</key>
+    <string>2.6</string>
+    <key>itemName</key>
+    <string>Gemini</string>
+    <key>softwareVersionBundleId</key>
+    <string>com.retro.gemini</string>
+</dict>
+</plist>

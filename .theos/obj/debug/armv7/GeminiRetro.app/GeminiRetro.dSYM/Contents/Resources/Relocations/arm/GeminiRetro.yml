@@ -1,0 +1,286 @@
+---
+triple:          'armv7-apple-darwin'
+binary-path:     '/Users/xwektron/Desktop/AI_Uygulamalar/YZ_Client/.theos/obj/debug/armv7/GeminiRetro.app/GeminiRetro'
+relocations:
+  - { offset: 0x1E, size: 0x4, addend: 0x0, symName: '-[AppDelegate application:didFinishLaunchingWithOptions:]', symObjAddr: 0x0, symBinAddr: 0xA378, symSize: 0x2E4 }
+  - { offset: 0x1356, size: 0x4, addend: 0x0, symName: '-[AppDelegate application:didFinishLaunchingWithOptions:]', symObjAddr: 0x0, symBinAddr: 0xA378, symSize: 0x2E4 }
+  - { offset: 0x135A, size: 0x4, addend: 0x0, symName: '-[AppDelegate window]', symObjAddr: 0x2E4, symBinAddr: 0xA65C, symSize: 0x1C }
+  - { offset: 0x13BA, size: 0x4, addend: 0x0, symName: '-[AppDelegate window]', symObjAddr: 0x2E4, symBinAddr: 0xA65C, symSize: 0x1C }
+  - { offset: 0x13BE, size: 0x4, addend: 0x0, symName: '-[AppDelegate setWindow:]', symObjAddr: 0x300, symBinAddr: 0xA678, symSize: 0x26 }
+  - { offset: 0x13F0, size: 0x4, addend: 0x0, symName: '-[AppDelegate setWindow:]', symObjAddr: 0x300, symBinAddr: 0xA678, symSize: 0x26 }
+  - { offset: 0x13F4, size: 0x4, addend: 0x0, symName: '-[AppDelegate chatViewController]', symObjAddr: 0x326, symBinAddr: 0xA69E, symSize: 0x1C }
+  - { offset: 0x142E, size: 0x4, addend: 0x0, symName: '-[AppDelegate chatViewController]', symObjAddr: 0x326, symBinAddr: 0xA69E, symSize: 0x1C }
+  - { offset: 0x1432, size: 0x4, addend: 0x0, symName: '-[AppDelegate setChatViewController:]', symObjAddr: 0x342, symBinAddr: 0xA6BA, symSize: 0x26 }
+  - { offset: 0x1464, size: 0x4, addend: 0x0, symName: '-[AppDelegate setChatViewController:]', symObjAddr: 0x342, symBinAddr: 0xA6BA, symSize: 0x26 }
+  - { offset: 0x1468, size: 0x4, addend: 0x0, symName: '-[AppDelegate .cxx_destruct]', symObjAddr: 0x368, symBinAddr: 0xA6E0, symSize: 0x3C }
+  - { offset: 0x14A2, size: 0x4, addend: 0x0, symName: '-[AppDelegate .cxx_destruct]', symObjAddr: 0x368, symBinAddr: 0xA6E0, symSize: 0x3C }
+  - { offset: 0x1E3C, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell initWithStyle:reuseIdentifier:]', symObjAddr: 0x0, symBinAddr: 0xA720, symSize: 0x3A8 }
+  - { offset: 0x1E98, size: 0x4, addend: 0x0, symName: _kCornerRadius, symObjAddr: 0x105C, symBinAddr: 0x171F4, symSize: 0x0 }
+  - { offset: 0x356B, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell initWithStyle:reuseIdentifier:]', symObjAddr: 0x0, symBinAddr: 0xA720, symSize: 0x3A8 }
+  - { offset: 0x356F, size: 0x4, addend: 0x0, symName: '+[ChatBubbleCell messageFont]', symObjAddr: 0x3A8, symBinAddr: 0xAAC8, symSize: 0x3C }
+  - { offset: 0x35C0, size: 0x4, addend: 0x0, symName: '+[ChatBubbleCell messageFont]', symObjAddr: 0x3A8, symBinAddr: 0xAAC8, symSize: 0x3C }
+  - { offset: 0x35C4, size: 0x4, addend: 0x0, symName: '+[ChatBubbleCell sizeForText:maxWidth:]', symObjAddr: 0x3E4, symBinAddr: 0xAB04, symSize: 0x18E }
+  - { offset: 0x35F5, size: 0x4, addend: 0x0, symName: '+[ChatBubbleCell sizeForText:maxWidth:]', symObjAddr: 0x3E4, symBinAddr: 0xAB04, symSize: 0x18E }
+  - { offset: 0x35F9, size: 0x4, addend: 0x0, symName: _CGSizeMake, symObjAddr: 0x572, symBinAddr: 0xAC92, symSize: 0x26 }
+  - { offset: 0x3658, size: 0x4, addend: 0x0, symName: _CGSizeMake, symObjAddr: 0x572, symBinAddr: 0xAC92, symSize: 0x26 }
+  - { offset: 0x365C, size: 0x4, addend: 0x0, symName: '+[ChatBubbleCell heightForMessage:containerWidth:]', symObjAddr: 0x598, symBinAddr: 0xACB8, symSize: 0x160 }
+  - { offset: 0x369D, size: 0x4, addend: 0x0, symName: '+[ChatBubbleCell heightForMessage:containerWidth:]', symObjAddr: 0x598, symBinAddr: 0xACB8, symSize: 0x160 }
+  - { offset: 0x36A1, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell configureWithMessage:containerWidth:]', symObjAddr: 0x6F8, symBinAddr: 0xAE18, symSize: 0x3F0 }
+  - { offset: 0x3726, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell configureWithMessage:containerWidth:]', symObjAddr: 0x6F8, symBinAddr: 0xAE18, symSize: 0x3F0 }
+  - { offset: 0x372A, size: 0x4, addend: 0x0, symName: _CGRectMake, symObjAddr: 0xAE8, symBinAddr: 0xB208, symSize: 0x42 }
+  - { offset: 0x37F4, size: 0x4, addend: 0x0, symName: _CGRectMake, symObjAddr: 0xAE8, symBinAddr: 0xB208, symSize: 0x42 }
+  - { offset: 0x37F8, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell bubbleBackgroundView]', symObjAddr: 0xB2A, symBinAddr: 0xB24A, symSize: 0x1C }
+  - { offset: 0x3857, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell bubbleBackgroundView]', symObjAddr: 0xB2A, symBinAddr: 0xB24A, symSize: 0x1C }
+  - { offset: 0x385B, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell setBubbleBackgroundView:]', symObjAddr: 0xB46, symBinAddr: 0xB266, symSize: 0x26 }
+  - { offset: 0x388D, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell setBubbleBackgroundView:]', symObjAddr: 0xB46, symBinAddr: 0xB266, symSize: 0x26 }
+  - { offset: 0x3891, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell messageLabel]', symObjAddr: 0xB6C, symBinAddr: 0xB28C, symSize: 0x1C }
+  - { offset: 0x38CB, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell messageLabel]', symObjAddr: 0xB6C, symBinAddr: 0xB28C, symSize: 0x1C }
+  - { offset: 0x38CF, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell setMessageLabel:]', symObjAddr: 0xB88, symBinAddr: 0xB2A8, symSize: 0x26 }
+  - { offset: 0x3901, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell setMessageLabel:]', symObjAddr: 0xB88, symBinAddr: 0xB2A8, symSize: 0x26 }
+  - { offset: 0x3905, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell message]', symObjAddr: 0xBAE, symBinAddr: 0xB2CE, symSize: 0x1C }
+  - { offset: 0x393F, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell message]', symObjAddr: 0xBAE, symBinAddr: 0xB2CE, symSize: 0x1C }
+  - { offset: 0x3943, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell setMessage:]', symObjAddr: 0xBCA, symBinAddr: 0xB2EA, symSize: 0x26 }
+  - { offset: 0x3975, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell setMessage:]', symObjAddr: 0xBCA, symBinAddr: 0xB2EA, symSize: 0x26 }
+  - { offset: 0x3979, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell .cxx_destruct]', symObjAddr: 0xBF0, symBinAddr: 0xB310, symSize: 0x52 }
+  - { offset: 0x39B3, size: 0x4, addend: 0x0, symName: '-[ChatBubbleCell .cxx_destruct]', symObjAddr: 0xBF0, symBinAddr: 0xB310, symSize: 0x52 }
+  - { offset: 0x3A3A, size: 0x4, addend: 0x0, symName: '+[ChatMessage messageWithText:sender:]', symObjAddr: 0x0, symBinAddr: 0xB362, symSize: 0xEA }
+  - { offset: 0x3A3E, size: 0x4, addend: 0x0, symName: '_OBJC_CLASS_$_ChatMessage', symObjAddr: 0x1B0, symBinAddr: 0x1A13C, symSize: 0x0 }
+  - { offset: 0x3BA6, size: 0x4, addend: 0x0, symName: '+[ChatMessage messageWithText:sender:]', symObjAddr: 0x0, symBinAddr: 0xB362, symSize: 0xEA }
+  - { offset: 0x3BAA, size: 0x4, addend: 0x0, symName: '-[ChatMessage text]', symObjAddr: 0xEA, symBinAddr: 0xB44C, symSize: 0xE }
+  - { offset: 0x3C05, size: 0x4, addend: 0x0, symName: '-[ChatMessage text]', symObjAddr: 0xEA, symBinAddr: 0xB44C, symSize: 0xE }
+  - { offset: 0x3C09, size: 0x4, addend: 0x0, symName: '-[ChatMessage setText:]', symObjAddr: 0xF8, symBinAddr: 0xB45A, symSize: 0x1C }
+  - { offset: 0x3C3B, size: 0x4, addend: 0x0, symName: '-[ChatMessage setText:]', symObjAddr: 0xF8, symBinAddr: 0xB45A, symSize: 0x1C }
+  - { offset: 0x3C3F, size: 0x4, addend: 0x0, symName: '-[ChatMessage sender]', symObjAddr: 0x114, symBinAddr: 0xB476, symSize: 0xE }
+  - { offset: 0x3C79, size: 0x4, addend: 0x0, symName: '-[ChatMessage sender]', symObjAddr: 0x114, symBinAddr: 0xB476, symSize: 0xE }
+  - { offset: 0x3C7D, size: 0x4, addend: 0x0, symName: '-[ChatMessage setSender:]', symObjAddr: 0x122, symBinAddr: 0xB484, symSize: 0x12 }
+  - { offset: 0x3CAF, size: 0x4, addend: 0x0, symName: '-[ChatMessage setSender:]', symObjAddr: 0x122, symBinAddr: 0xB484, symSize: 0x12 }
+  - { offset: 0x3CB3, size: 0x4, addend: 0x0, symName: '-[ChatMessage timestamp]', symObjAddr: 0x134, symBinAddr: 0xB496, symSize: 0xE }
+  - { offset: 0x3CED, size: 0x4, addend: 0x0, symName: '-[ChatMessage timestamp]', symObjAddr: 0x134, symBinAddr: 0xB496, symSize: 0xE }
+  - { offset: 0x3CF1, size: 0x4, addend: 0x0, symName: '-[ChatMessage setTimestamp:]', symObjAddr: 0x142, symBinAddr: 0xB4A4, symSize: 0x1A }
+  - { offset: 0x3D23, size: 0x4, addend: 0x0, symName: '-[ChatMessage setTimestamp:]', symObjAddr: 0x142, symBinAddr: 0xB4A4, symSize: 0x1A }
+  - { offset: 0x3D27, size: 0x4, addend: 0x0, symName: '-[ChatMessage cachedHeight]', symObjAddr: 0x15C, symBinAddr: 0xB4BE, symSize: 0x14 }
+  - { offset: 0x3D61, size: 0x4, addend: 0x0, symName: '-[ChatMessage cachedHeight]', symObjAddr: 0x15C, symBinAddr: 0xB4BE, symSize: 0x14 }
+  - { offset: 0x3D65, size: 0x4, addend: 0x0, symName: '-[ChatMessage setCachedHeight:]', symObjAddr: 0x170, symBinAddr: 0xB4D2, symSize: 0x1C }
+  - { offset: 0x3D97, size: 0x4, addend: 0x0, symName: '-[ChatMessage setCachedHeight:]', symObjAddr: 0x170, symBinAddr: 0xB4D2, symSize: 0x1C }
+  - { offset: 0x3D9B, size: 0x4, addend: 0x0, symName: '-[ChatMessage .cxx_destruct]', symObjAddr: 0x18C, symBinAddr: 0xB4EE, symSize: 0x24 }
+  - { offset: 0x3DD5, size: 0x4, addend: 0x0, symName: '-[ChatMessage .cxx_destruct]', symObjAddr: 0x18C, symBinAddr: 0xB4EE, symSize: 0x24 }
+  - { offset: 0x3DD9, size: 0x4, addend: 0x0, symName: '_OBJC_CLASS_$_ChatMessage', symObjAddr: 0x1B0, symBinAddr: 0x1A13C, symSize: 0x0 }
+  - { offset: 0x3E48, size: 0x4, addend: 0x0, symName: '-[ChatViewController viewDidLoad]', symObjAddr: 0x0, symBinAddr: 0xB518, symSize: 0x2E0 }
+  - { offset: 0x3E51, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView:cellForRowAtIndexPath:]', symObjAddr: 0x320E, symBinAddr: 0xE726, symSize: 0x166 }
+  - { offset: 0x3E55, size: 0x4, addend: 0x0, symName: '-[ChatViewController dealloc]', symObjAddr: 0x3374, symBinAddr: 0xE88C, symSize: 0x6E }
+  - { offset: 0x3E79, size: 0x4, addend: 0x0, symName: '_tableView:cellForRowAtIndexPath:.CellId', symObjAddr: 0x5864, symBinAddr: 0x1A248, symSize: 0x0 }
+  - { offset: 0x63B7, size: 0x4, addend: 0x0, symName: '-[ChatViewController viewDidLoad]', symObjAddr: 0x0, symBinAddr: 0xB518, symSize: 0x2E0 }
+  - { offset: 0x63BB, size: 0x4, addend: 0x0, symName: '-[ChatViewController viewWillAppear:]', symObjAddr: 0x2E0, symBinAddr: 0xB7F8, symSize: 0x4E }
+  - { offset: 0x63E8, size: 0x4, addend: 0x0, symName: '-[ChatViewController viewWillAppear:]', symObjAddr: 0x2E0, symBinAddr: 0xB7F8, symSize: 0x4E }
+  - { offset: 0x63EC, size: 0x4, addend: 0x0, symName: '-[ChatViewController userDefaultsDidChange:]', symObjAddr: 0x32E, symBinAddr: 0xB846, symSize: 0x9C }
+  - { offset: 0x6445, size: 0x4, addend: 0x0, symName: '-[ChatViewController userDefaultsDidChange:]', symObjAddr: 0x32E, symBinAddr: 0xB846, symSize: 0x9C }
+  - { offset: 0x6449, size: 0x4, addend: 0x0, symName: '___44-[ChatViewController userDefaultsDidChange:]_block_invoke', symObjAddr: 0x3CA, symBinAddr: 0xB8E2, symSize: 0x20 }
+  - { offset: 0x6494, size: 0x4, addend: 0x0, symName: '___44-[ChatViewController userDefaultsDidChange:]_block_invoke', symObjAddr: 0x3CA, symBinAddr: 0xB8E2, symSize: 0x20 }
+  - { offset: 0x6498, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20s, symObjAddr: 0x3EA, symBinAddr: 0xB902, symSize: 0x20 }
+  - { offset: 0x64D0, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20s, symObjAddr: 0x3EA, symBinAddr: 0xB902, symSize: 0x20 }
+  - { offset: 0x64D4, size: 0x4, addend: 0x0, symName: ___destroy_helper_block_e4_20s, symObjAddr: 0x40A, symBinAddr: 0xB922, symSize: 0x16 }
+  - { offset: 0x64F4, size: 0x4, addend: 0x0, symName: ___destroy_helper_block_e4_20s, symObjAddr: 0x40A, symBinAddr: 0xB922, symSize: 0x16 }
+  - { offset: 0x64F8, size: 0x4, addend: 0x0, symName: '-[ChatViewController updateTitleWithModel]', symObjAddr: 0x420, symBinAddr: 0xB938, symSize: 0x17A }
+  - { offset: 0x650F, size: 0x4, addend: 0x0, symName: '-[ChatViewController updateTitleWithModel]', symObjAddr: 0x420, symBinAddr: 0xB938, symSize: 0x17A }
+  - { offset: 0x6513, size: 0x4, addend: 0x0, symName: '-[ChatViewController setupNavigationItems]', symObjAddr: 0x59A, symBinAddr: 0xBAB2, symSize: 0x10E }
+  - { offset: 0x655C, size: 0x4, addend: 0x0, symName: '-[ChatViewController setupNavigationItems]', symObjAddr: 0x59A, symBinAddr: 0xBAB2, symSize: 0x10E }
+  - { offset: 0x6560, size: 0x4, addend: 0x0, symName: '-[ChatViewController openSettingsTapped]', symObjAddr: 0x6A8, symBinAddr: 0xBBC0, symSize: 0xAC }
+  - { offset: 0x658D, size: 0x4, addend: 0x0, symName: '-[ChatViewController openSettingsTapped]', symObjAddr: 0x6A8, symBinAddr: 0xBBC0, symSize: 0xAC }
+  - { offset: 0x6591, size: 0x4, addend: 0x0, symName: '-[ChatViewController settingsDidUpdate]', symObjAddr: 0x754, symBinAddr: 0xBC6C, symSize: 0x24 }
+  - { offset: 0x65DA, size: 0x4, addend: 0x0, symName: '-[ChatViewController settingsDidUpdate]', symObjAddr: 0x754, symBinAddr: 0xBC6C, symSize: 0x24 }
+  - { offset: 0x660B, size: 0x4, addend: 0x0, symName: '-[ChatViewController setupTableView]', symObjAddr: 0x778, symBinAddr: 0xBC90, symSize: 0x310 }
+  - { offset: 0x660F, size: 0x4, addend: 0x0, symName: _CGRectMake, symObjAddr: 0xA88, symBinAddr: 0xBFA0, symSize: 0x48 }
+  - { offset: 0x666A, size: 0x4, addend: 0x0, symName: _CGRectMake, symObjAddr: 0xA88, symBinAddr: 0xBFA0, symSize: 0x48 }
+  - { offset: 0x66CD, size: 0x4, addend: 0x0, symName: '-[ChatViewController setupInputBar]', symObjAddr: 0xAD0, symBinAddr: 0xBFE8, symSize: 0xA58 }
+  - { offset: 0x66D1, size: 0x4, addend: 0x0, symName: '-[ChatViewController toggleWebSearch]', symObjAddr: 0x1528, symBinAddr: 0xCA40, symSize: 0x1B0 }
+  - { offset: 0x675A, size: 0x4, addend: 0x0, symName: '-[ChatViewController toggleWebSearch]', symObjAddr: 0x1528, symBinAddr: 0xCA40, symSize: 0x1B0 }
+  - { offset: 0x675E, size: 0x4, addend: 0x0, symName: '___37-[ChatViewController toggleWebSearch]_block_invoke', symObjAddr: 0x16D8, symBinAddr: 0xCBF0, symSize: 0xA0 }
+  - { offset: 0x678D, size: 0x4, addend: 0x0, symName: '___37-[ChatViewController toggleWebSearch]_block_invoke', symObjAddr: 0x16D8, symBinAddr: 0xCBF0, symSize: 0xA0 }
+  - { offset: 0x67CB, size: 0x4, addend: 0x0, symName: '___37-[ChatViewController toggleWebSearch]_block_invoke_2', symObjAddr: 0x1778, symBinAddr: 0xCC90, symSize: 0x98 }
+  - { offset: 0x67CF, size: 0x4, addend: 0x0, symName: '___37-[ChatViewController toggleWebSearch]_block_invoke_3', symObjAddr: 0x1810, symBinAddr: 0xCD28, symSize: 0x98 }
+  - { offset: 0x6815, size: 0x4, addend: 0x0, symName: '___37-[ChatViewController toggleWebSearch]_block_invoke_3', symObjAddr: 0x1810, symBinAddr: 0xCD28, symSize: 0x98 }
+  - { offset: 0x6819, size: 0x4, addend: 0x0, symName: '-[ChatViewController updateWebSearchButtonAppearance]', symObjAddr: 0x18A8, symBinAddr: 0xCDC0, symSize: 0x330 }
+  - { offset: 0x6853, size: 0x4, addend: 0x0, symName: '-[ChatViewController updateWebSearchButtonAppearance]', symObjAddr: 0x18A8, symBinAddr: 0xCDC0, symSize: 0x330 }
+  - { offset: 0x6857, size: 0x4, addend: 0x0, symName: '-[ChatViewController addWelcomeMessageIfNeeded]', symObjAddr: 0x1BD8, symBinAddr: 0xD0F0, symSize: 0xF2 }
+  - { offset: 0x6886, size: 0x4, addend: 0x0, symName: '-[ChatViewController addWelcomeMessageIfNeeded]', symObjAddr: 0x1BD8, symBinAddr: 0xD0F0, symSize: 0xF2 }
+  - { offset: 0x688A, size: 0x4, addend: 0x0, symName: '-[ChatViewController clearChatTapped]', symObjAddr: 0x1CCA, symBinAddr: 0xD1E2, symSize: 0x80 }
+  - { offset: 0x68DD, size: 0x4, addend: 0x0, symName: '-[ChatViewController clearChatTapped]', symObjAddr: 0x1CCA, symBinAddr: 0xD1E2, symSize: 0x80 }
+  - { offset: 0x68E1, size: 0x4, addend: 0x0, symName: '-[ChatViewController dismissKeyboard]', symObjAddr: 0x1D4A, symBinAddr: 0xD262, symSize: 0x42 }
+  - { offset: 0x690E, size: 0x4, addend: 0x0, symName: '-[ChatViewController dismissKeyboard]', symObjAddr: 0x1D4A, symBinAddr: 0xD262, symSize: 0x42 }
+  - { offset: 0x6912, size: 0x4, addend: 0x0, symName: '-[ChatViewController registerKeyboardNotifications]', symObjAddr: 0x1D8C, symBinAddr: 0xD2A4, symSize: 0xDC }
+  - { offset: 0x693F, size: 0x4, addend: 0x0, symName: '-[ChatViewController registerKeyboardNotifications]', symObjAddr: 0x1D8C, symBinAddr: 0xD2A4, symSize: 0xDC }
+  - { offset: 0x6970, size: 0x4, addend: 0x0, symName: '-[ChatViewController keyboardWillShow:]', symObjAddr: 0x1E68, symBinAddr: 0xD380, symSize: 0x348 }
+  - { offset: 0x6A0C, size: 0x4, addend: 0x0, symName: '___39-[ChatViewController keyboardWillShow:]_block_invoke', symObjAddr: 0x21B0, symBinAddr: 0xD6C8, symSize: 0x220 }
+  - { offset: 0x6A10, size: 0x4, addend: 0x0, symName: '___39-[ChatViewController keyboardWillShow:]_block_invoke_2', symObjAddr: 0x23D0, symBinAddr: 0xD8E8, symSize: 0x28 }
+  - { offset: 0x6A72, size: 0x4, addend: 0x0, symName: '___39-[ChatViewController keyboardWillShow:]_block_invoke_2', symObjAddr: 0x23D0, symBinAddr: 0xD8E8, symSize: 0x28 }
+  - { offset: 0x6A76, size: 0x4, addend: 0x0, symName: '-[ChatViewController keyboardWillHide:]', symObjAddr: 0x23F8, symBinAddr: 0xD910, symSize: 0x1B8 }
+  - { offset: 0x6ABC, size: 0x4, addend: 0x0, symName: '-[ChatViewController keyboardWillHide:]', symObjAddr: 0x23F8, symBinAddr: 0xD910, symSize: 0x1B8 }
+  - { offset: 0x6B2B, size: 0x4, addend: 0x0, symName: '___39-[ChatViewController keyboardWillHide:]_block_invoke', symObjAddr: 0x25B0, symBinAddr: 0xDAC8, symSize: 0x1D8 }
+  - { offset: 0x6B2F, size: 0x4, addend: 0x0, symName: '-[ChatViewController textFieldShouldReturn:]', symObjAddr: 0x2788, symBinAddr: 0xDCA0, symSize: 0x42 }
+  - { offset: 0x6B91, size: 0x4, addend: 0x0, symName: '-[ChatViewController textFieldShouldReturn:]', symObjAddr: 0x2788, symBinAddr: 0xDCA0, symSize: 0x42 }
+  - { offset: 0x6B95, size: 0x4, addend: 0x0, symName: '-[ChatViewController sendButtonTapped]', symObjAddr: 0x27CA, symBinAddr: 0xDCE2, symSize: 0x304 }
+  - { offset: 0x6BD6, size: 0x4, addend: 0x0, symName: '-[ChatViewController sendButtonTapped]', symObjAddr: 0x27CA, symBinAddr: 0xDCE2, symSize: 0x304 }
+  - { offset: 0x6BDA, size: 0x4, addend: 0x0, symName: '___38-[ChatViewController sendButtonTapped]_block_invoke', symObjAddr: 0x2ACE, symBinAddr: 0xDFE6, symSize: 0x228 }
+  - { offset: 0x6C2A, size: 0x4, addend: 0x0, symName: '___38-[ChatViewController sendButtonTapped]_block_invoke', symObjAddr: 0x2ACE, symBinAddr: 0xDFE6, symSize: 0x228 }
+  - { offset: 0x6C2E, size: 0x4, addend: 0x0, symName: '-[ChatViewController setSendingState:]', symObjAddr: 0x2CF6, symBinAddr: 0xE20E, symSize: 0x11C }
+  - { offset: 0x6CC5, size: 0x4, addend: 0x0, symName: '-[ChatViewController setSendingState:]', symObjAddr: 0x2CF6, symBinAddr: 0xE20E, symSize: 0x11C }
+  - { offset: 0x6CC9, size: 0x4, addend: 0x0, symName: '-[ChatViewController scrollToBottomAnimated:]', symObjAddr: 0x2E12, symBinAddr: 0xE32A, symSize: 0xF4 }
+  - { offset: 0x6D06, size: 0x4, addend: 0x0, symName: '-[ChatViewController scrollToBottomAnimated:]', symObjAddr: 0x2E12, symBinAddr: 0xE32A, symSize: 0xF4 }
+  - { offset: 0x6D0A, size: 0x4, addend: 0x0, symName: '-[ChatViewController showAuthPrompt]', symObjAddr: 0x2F06, symBinAddr: 0xE41E, symSize: 0x170 }
+  - { offset: 0x6D60, size: 0x4, addend: 0x0, symName: '-[ChatViewController showAuthPrompt]', symObjAddr: 0x2F06, symBinAddr: 0xE41E, symSize: 0x170 }
+  - { offset: 0x6D64, size: 0x4, addend: 0x0, symName: '___36-[ChatViewController showAuthPrompt]_block_invoke', symObjAddr: 0x3076, symBinAddr: 0xE58E, symSize: 0x36 }
+  - { offset: 0x6DA1, size: 0x4, addend: 0x0, symName: '___36-[ChatViewController showAuthPrompt]_block_invoke', symObjAddr: 0x3076, symBinAddr: 0xE58E, symSize: 0x36 }
+  - { offset: 0x6DA5, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView:numberOfRowsInSection:]', symObjAddr: 0x30AC, symBinAddr: 0xE5C4, symSize: 0x68 }
+  - { offset: 0x6DEF, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView:numberOfRowsInSection:]', symObjAddr: 0x30AC, symBinAddr: 0xE5C4, symSize: 0x68 }
+  - { offset: 0x6DF3, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView:heightForRowAtIndexPath:]', symObjAddr: 0x3114, symBinAddr: 0xE62C, symSize: 0xFA }
+  - { offset: 0x6E43, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView:heightForRowAtIndexPath:]', symObjAddr: 0x3114, symBinAddr: 0xE62C, symSize: 0xFA }
+  - { offset: 0x6E47, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView:cellForRowAtIndexPath:]', symObjAddr: 0x320E, symBinAddr: 0xE726, symSize: 0x166 }
+  - { offset: 0x6EA8, size: 0x4, addend: 0x0, symName: '-[ChatViewController dealloc]', symObjAddr: 0x3374, symBinAddr: 0xE88C, symSize: 0x6E }
+  - { offset: 0x6EAC, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView]', symObjAddr: 0x33E2, symBinAddr: 0xE8FA, symSize: 0x1C }
+  - { offset: 0x6EDA, size: 0x4, addend: 0x0, symName: '-[ChatViewController tableView]', symObjAddr: 0x33E2, symBinAddr: 0xE8FA, symSize: 0x1C }
+  - { offset: 0x6EDE, size: 0x4, addend: 0x0, symName: '-[ChatViewController setTableView:]', symObjAddr: 0x33FE, symBinAddr: 0xE916, symSize: 0x26 }
+  - { offset: 0x6F10, size: 0x4, addend: 0x0, symName: '-[ChatViewController setTableView:]', symObjAddr: 0x33FE, symBinAddr: 0xE916, symSize: 0x26 }
+  - { offset: 0x6F14, size: 0x4, addend: 0x0, symName: '-[ChatViewController messages]', symObjAddr: 0x3424, symBinAddr: 0xE93C, symSize: 0x1C }
+  - { offset: 0x6F4E, size: 0x4, addend: 0x0, symName: '-[ChatViewController messages]', symObjAddr: 0x3424, symBinAddr: 0xE93C, symSize: 0x1C }
+  - { offset: 0x6F52, size: 0x4, addend: 0x0, symName: '-[ChatViewController setMessages:]', symObjAddr: 0x3440, symBinAddr: 0xE958, symSize: 0x26 }
+  - { offset: 0x6F84, size: 0x4, addend: 0x0, symName: '-[ChatViewController setMessages:]', symObjAddr: 0x3440, symBinAddr: 0xE958, symSize: 0x26 }
+  - { offset: 0x6F88, size: 0x4, addend: 0x0, symName: '-[ChatViewController inputContainerView]', symObjAddr: 0x3466, symBinAddr: 0xE97E, symSize: 0x1C }
+  - { offset: 0x6FC2, size: 0x4, addend: 0x0, symName: '-[ChatViewController inputContainerView]', symObjAddr: 0x3466, symBinAddr: 0xE97E, symSize: 0x1C }
+  - { offset: 0x6FC6, size: 0x4, addend: 0x0, symName: '-[ChatViewController setInputContainerView:]', symObjAddr: 0x3482, symBinAddr: 0xE99A, symSize: 0x26 }
+  - { offset: 0x6FF8, size: 0x4, addend: 0x0, symName: '-[ChatViewController setInputContainerView:]', symObjAddr: 0x3482, symBinAddr: 0xE99A, symSize: 0x26 }
+  - { offset: 0x6FFC, size: 0x4, addend: 0x0, symName: '-[ChatViewController webSearchButton]', symObjAddr: 0x34A8, symBinAddr: 0xE9C0, symSize: 0x1C }
+  - { offset: 0x7036, size: 0x4, addend: 0x0, symName: '-[ChatViewController webSearchButton]', symObjAddr: 0x34A8, symBinAddr: 0xE9C0, symSize: 0x1C }
+  - { offset: 0x703A, size: 0x4, addend: 0x0, symName: '-[ChatViewController setWebSearchButton:]', symObjAddr: 0x34C4, symBinAddr: 0xE9DC, symSize: 0x26 }
+  - { offset: 0x706C, size: 0x4, addend: 0x0, symName: '-[ChatViewController setWebSearchButton:]', symObjAddr: 0x34C4, symBinAddr: 0xE9DC, symSize: 0x26 }
+  - { offset: 0x7070, size: 0x4, addend: 0x0, symName: '-[ChatViewController inputTextField]', symObjAddr: 0x34EA, symBinAddr: 0xEA02, symSize: 0x1C }
+  - { offset: 0x70AA, size: 0x4, addend: 0x0, symName: '-[ChatViewController inputTextField]', symObjAddr: 0x34EA, symBinAddr: 0xEA02, symSize: 0x1C }
+  - { offset: 0x70AE, size: 0x4, addend: 0x0, symName: '-[ChatViewController setInputTextField:]', symObjAddr: 0x3506, symBinAddr: 0xEA1E, symSize: 0x26 }
+  - { offset: 0x70E0, size: 0x4, addend: 0x0, symName: '-[ChatViewController setInputTextField:]', symObjAddr: 0x3506, symBinAddr: 0xEA1E, symSize: 0x26 }
+  - { offset: 0x70E4, size: 0x4, addend: 0x0, symName: '-[ChatViewController sendButton]', symObjAddr: 0x352C, symBinAddr: 0xEA44, symSize: 0x1C }
+  - { offset: 0x711E, size: 0x4, addend: 0x0, symName: '-[ChatViewController sendButton]', symObjAddr: 0x352C, symBinAddr: 0xEA44, symSize: 0x1C }
+  - { offset: 0x7122, size: 0x4, addend: 0x0, symName: '-[ChatViewController setSendButton:]', symObjAddr: 0x3548, symBinAddr: 0xEA60, symSize: 0x26 }
+  - { offset: 0x7154, size: 0x4, addend: 0x0, symName: '-[ChatViewController setSendButton:]', symObjAddr: 0x3548, symBinAddr: 0xEA60, symSize: 0x26 }
+  - { offset: 0x7158, size: 0x4, addend: 0x0, symName: '-[ChatViewController activityIndicator]', symObjAddr: 0x356E, symBinAddr: 0xEA86, symSize: 0x1C }
+  - { offset: 0x7192, size: 0x4, addend: 0x0, symName: '-[ChatViewController activityIndicator]', symObjAddr: 0x356E, symBinAddr: 0xEA86, symSize: 0x1C }
+  - { offset: 0x7196, size: 0x4, addend: 0x0, symName: '-[ChatViewController setActivityIndicator:]', symObjAddr: 0x358A, symBinAddr: 0xEAA2, symSize: 0x26 }
+  - { offset: 0x71C8, size: 0x4, addend: 0x0, symName: '-[ChatViewController setActivityIndicator:]', symObjAddr: 0x358A, symBinAddr: 0xEAA2, symSize: 0x26 }
+  - { offset: 0x71CC, size: 0x4, addend: 0x0, symName: '-[ChatViewController keyboardHeight]', symObjAddr: 0x35B0, symBinAddr: 0xEAC8, symSize: 0x22 }
+  - { offset: 0x7206, size: 0x4, addend: 0x0, symName: '-[ChatViewController keyboardHeight]', symObjAddr: 0x35B0, symBinAddr: 0xEAC8, symSize: 0x22 }
+  - { offset: 0x720A, size: 0x4, addend: 0x0, symName: '-[ChatViewController setKeyboardHeight:]', symObjAddr: 0x35D2, symBinAddr: 0xEAEA, symSize: 0x2A }
+  - { offset: 0x723C, size: 0x4, addend: 0x0, symName: '-[ChatViewController setKeyboardHeight:]', symObjAddr: 0x35D2, symBinAddr: 0xEAEA, symSize: 0x2A }
+  - { offset: 0x7240, size: 0x4, addend: 0x0, symName: '-[ChatViewController isSending]', symObjAddr: 0x35FC, symBinAddr: 0xEB14, symSize: 0x1E }
+  - { offset: 0x727A, size: 0x4, addend: 0x0, symName: '-[ChatViewController isSending]', symObjAddr: 0x35FC, symBinAddr: 0xEB14, symSize: 0x1E }
+  - { offset: 0x727E, size: 0x4, addend: 0x0, symName: '-[ChatViewController setIsSending:]', symObjAddr: 0x361A, symBinAddr: 0xEB32, symSize: 0x24 }
+  - { offset: 0x72B0, size: 0x4, addend: 0x0, symName: '-[ChatViewController setIsSending:]', symObjAddr: 0x361A, symBinAddr: 0xEB32, symSize: 0x24 }
+  - { offset: 0x72B4, size: 0x4, addend: 0x0, symName: '-[ChatViewController isWebSearchActive]', symObjAddr: 0x363E, symBinAddr: 0xEB56, symSize: 0x1E }
+  - { offset: 0x72EE, size: 0x4, addend: 0x0, symName: '-[ChatViewController isWebSearchActive]', symObjAddr: 0x363E, symBinAddr: 0xEB56, symSize: 0x1E }
+  - { offset: 0x72F2, size: 0x4, addend: 0x0, symName: '-[ChatViewController setIsWebSearchActive:]', symObjAddr: 0x365C, symBinAddr: 0xEB74, symSize: 0x24 }
+  - { offset: 0x7324, size: 0x4, addend: 0x0, symName: '-[ChatViewController setIsWebSearchActive:]', symObjAddr: 0x365C, symBinAddr: 0xEB74, symSize: 0x24 }
+  - { offset: 0x7328, size: 0x4, addend: 0x0, symName: '-[ChatViewController .cxx_destruct]', symObjAddr: 0x3680, symBinAddr: 0xEB98, symSize: 0xAA }
+  - { offset: 0x7362, size: 0x4, addend: 0x0, symName: '-[ChatViewController .cxx_destruct]', symObjAddr: 0x3680, symBinAddr: 0xEB98, symSize: 0xAA }
+  - { offset: 0x8093, size: 0x4, addend: 0x0, symName: '+[GeminiClient sharedClient]', symObjAddr: 0x0, symBinAddr: 0xEC48, symSize: 0x5A }
+  - { offset: 0x8104, size: 0x4, addend: 0x0, symName: '+[GeminiClient sharedClient]', symObjAddr: 0x0, symBinAddr: 0xEC48, symSize: 0x5A }
+  - { offset: 0x8108, size: 0x4, addend: 0x0, symName: '___28+[GeminiClient sharedClient]_block_invoke', symObjAddr: 0x5A, symBinAddr: 0xECA2, symSize: 0x4E }
+  - { offset: 0x812A, size: 0x4, addend: 0x0, symName: _sharedClient.shared, symObjAddr: 0x7FCC, symBinAddr: 0x1A350, symSize: 0x0 }
+  - { offset: 0x813B, size: 0x4, addend: 0x0, symName: _sharedClient.onceToken, symObjAddr: 0x7FD0, symBinAddr: 0x1A354, symSize: 0x0 }
+  - { offset: 0x87DD, size: 0x4, addend: 0x0, symName: '___28+[GeminiClient sharedClient]_block_invoke', symObjAddr: 0x5A, symBinAddr: 0xECA2, symSize: 0x4E }
+  - { offset: 0x8803, size: 0x4, addend: 0x0, symName: '-[GeminiClient init]', symObjAddr: 0xA8, symBinAddr: 0xECF0, symSize: 0x218 }
+  - { offset: 0x8807, size: 0x4, addend: 0x0, symName: '-[GeminiClient saveApiKey:]', symObjAddr: 0x2C0, symBinAddr: 0xEF08, symSize: 0x16A }
+  - { offset: 0x885E, size: 0x4, addend: 0x0, symName: '-[GeminiClient saveApiKey:]', symObjAddr: 0x2C0, symBinAddr: 0xEF08, symSize: 0x16A }
+  - { offset: 0x8862, size: 0x4, addend: 0x0, symName: '-[GeminiClient saveSelectedModel:]', symObjAddr: 0x42A, symBinAddr: 0xF072, symSize: 0x122 }
+  - { offset: 0x889D, size: 0x4, addend: 0x0, symName: '-[GeminiClient saveSelectedModel:]', symObjAddr: 0x42A, symBinAddr: 0xF072, symSize: 0x122 }
+  - { offset: 0x88A1, size: 0x4, addend: 0x0, symName: '-[GeminiClient isAuthenticated]', symObjAddr: 0x54C, symBinAddr: 0xF194, symSize: 0x54 }
+  - { offset: 0x88DC, size: 0x4, addend: 0x0, symName: '-[GeminiClient isAuthenticated]', symObjAddr: 0x54C, symBinAddr: 0xF194, symSize: 0x54 }
+  - { offset: 0x88E0, size: 0x4, addend: 0x0, symName: '-[GeminiClient fetchAvailableModelsWithCompletion:]', symObjAddr: 0x5A0, symBinAddr: 0xF1E8, symSize: 0x27A }
+  - { offset: 0x8911, size: 0x4, addend: 0x0, symName: '-[GeminiClient fetchAvailableModelsWithCompletion:]', symObjAddr: 0x5A0, symBinAddr: 0xF1E8, symSize: 0x27A }
+  - { offset: 0x8915, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke', symObjAddr: 0x81A, symBinAddr: 0xF462, symSize: 0x60E }
+  - { offset: 0x89B6, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke', symObjAddr: 0x81A, symBinAddr: 0xF462, symSize: 0x60E }
+  - { offset: 0x89BA, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke_2', symObjAddr: 0xE28, symBinAddr: 0xFA70, symSize: 0x24 }
+  - { offset: 0x8B10, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke_2', symObjAddr: 0xE28, symBinAddr: 0xFA70, symSize: 0x24 }
+  - { offset: 0x8B14, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20s24b, symObjAddr: 0xE4C, symBinAddr: 0xFA94, symSize: 0x32 }
+  - { offset: 0x8B58, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20s24b, symObjAddr: 0xE4C, symBinAddr: 0xFA94, symSize: 0x32 }
+  - { offset: 0x8B7C, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke.79', symObjAddr: 0xEA2, symBinAddr: 0xFACA, symSize: 0x24 }
+  - { offset: 0x8B80, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke_2.110', symObjAddr: 0xEC6, symBinAddr: 0xFAEE, symSize: 0x24 }
+  - { offset: 0x8BC4, size: 0x4, addend: 0x0, symName: '___51-[GeminiClient fetchAvailableModelsWithCompletion:]_block_invoke_2.110', symObjAddr: 0xEC6, symBinAddr: 0xFAEE, symSize: 0x24 }
+  - { offset: 0x8BC8, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20b, symObjAddr: 0xEEA, symBinAddr: 0xFB12, symSize: 0x1C }
+  - { offset: 0x8C0C, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20b, symObjAddr: 0xEEA, symBinAddr: 0xFB12, symSize: 0x1C }
+  - { offset: 0x8C30, size: 0x4, addend: 0x0, symName: '-[GeminiClient sendMessage:history:completion:]', symObjAddr: 0xF20, symBinAddr: 0xFB30, symSize: 0xAF8 }
+  - { offset: 0x8C34, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke', symObjAddr: 0x1A18, symBinAddr: 0x10628, symSize: 0xB1C }
+  - { offset: 0x8DA8, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke', symObjAddr: 0x1A18, symBinAddr: 0x10628, symSize: 0xB1C }
+  - { offset: 0x8DAC, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke_2', symObjAddr: 0x2534, symBinAddr: 0x11144, symSize: 0x24 }
+  - { offset: 0x8FAC, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke_2', symObjAddr: 0x2534, symBinAddr: 0x11144, symSize: 0x24 }
+  - { offset: 0x8FB0, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke_3', symObjAddr: 0x2558, symBinAddr: 0x11168, symSize: 0x24 }
+  - { offset: 0x8FF4, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke_3', symObjAddr: 0x2558, symBinAddr: 0x11168, symSize: 0x24 }
+  - { offset: 0x8FF8, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke_4', symObjAddr: 0x257C, symBinAddr: 0x1118C, symSize: 0x78 }
+  - { offset: 0x903C, size: 0x4, addend: 0x0, symName: '___47-[GeminiClient sendMessage:history:completion:]_block_invoke_4', symObjAddr: 0x257C, symBinAddr: 0x1118C, symSize: 0x78 }
+  - { offset: 0x9040, size: 0x4, addend: 0x0, symName: '-[GeminiClient apiKey]', symObjAddr: 0x25F4, symBinAddr: 0x11204, symSize: 0xE }
+  - { offset: 0x9084, size: 0x4, addend: 0x0, symName: '-[GeminiClient apiKey]', symObjAddr: 0x25F4, symBinAddr: 0x11204, symSize: 0xE }
+  - { offset: 0x9088, size: 0x4, addend: 0x0, symName: '-[GeminiClient setApiKey:]', symObjAddr: 0x2602, symBinAddr: 0x11212, symSize: 0x1C }
+  - { offset: 0x90BA, size: 0x4, addend: 0x0, symName: '-[GeminiClient setApiKey:]', symObjAddr: 0x2602, symBinAddr: 0x11212, symSize: 0x1C }
+  - { offset: 0x90BE, size: 0x4, addend: 0x0, symName: '-[GeminiClient selectedModel]', symObjAddr: 0x261E, symBinAddr: 0x1122E, symSize: 0xE }
+  - { offset: 0x90F8, size: 0x4, addend: 0x0, symName: '-[GeminiClient selectedModel]', symObjAddr: 0x261E, symBinAddr: 0x1122E, symSize: 0xE }
+  - { offset: 0x90FC, size: 0x4, addend: 0x0, symName: '-[GeminiClient setSelectedModel:]', symObjAddr: 0x262C, symBinAddr: 0x1123C, symSize: 0x1C }
+  - { offset: 0x912E, size: 0x4, addend: 0x0, symName: '-[GeminiClient setSelectedModel:]', symObjAddr: 0x262C, symBinAddr: 0x1123C, symSize: 0x1C }
+  - { offset: 0x9132, size: 0x4, addend: 0x0, symName: '-[GeminiClient session]', symObjAddr: 0x2648, symBinAddr: 0x11258, symSize: 0xE }
+  - { offset: 0x916C, size: 0x4, addend: 0x0, symName: '-[GeminiClient session]', symObjAddr: 0x2648, symBinAddr: 0x11258, symSize: 0xE }
+  - { offset: 0x9170, size: 0x4, addend: 0x0, symName: '-[GeminiClient setSession:]', symObjAddr: 0x2656, symBinAddr: 0x11266, symSize: 0x1A }
+  - { offset: 0x91A2, size: 0x4, addend: 0x0, symName: '-[GeminiClient setSession:]', symObjAddr: 0x2656, symBinAddr: 0x11266, symSize: 0x1A }
+  - { offset: 0x91A6, size: 0x4, addend: 0x0, symName: '-[GeminiClient .cxx_destruct]', symObjAddr: 0x2670, symBinAddr: 0x11280, symSize: 0x2E }
+  - { offset: 0x91E0, size: 0x4, addend: 0x0, symName: '-[GeminiClient .cxx_destruct]', symObjAddr: 0x2670, symBinAddr: 0x11280, symSize: 0x2E }
+  - { offset: 0x9F55, size: 0x4, addend: 0x0, symName: '-[SettingsViewController init]', symObjAddr: 0x0, symBinAddr: 0x112B0, symSize: 0x54 }
+  - { offset: 0xBE6F, size: 0x4, addend: 0x0, symName: '-[SettingsViewController init]', symObjAddr: 0x0, symBinAddr: 0x112B0, symSize: 0x54 }
+  - { offset: 0xBE73, size: 0x4, addend: 0x0, symName: '-[SettingsViewController viewDidLoad]', symObjAddr: 0x54, symBinAddr: 0x11304, symSize: 0x160 }
+  - { offset: 0xBEA4, size: 0x4, addend: 0x0, symName: '-[SettingsViewController viewDidLoad]', symObjAddr: 0x54, symBinAddr: 0x11304, symSize: 0x160 }
+  - { offset: 0xBEA8, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setupFields]', symObjAddr: 0x1B4, symBinAddr: 0x11464, symSize: 0x366 }
+  - { offset: 0xBED5, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setupFields]', symObjAddr: 0x1B4, symBinAddr: 0x11464, symSize: 0x366 }
+  - { offset: 0xBED9, size: 0x4, addend: 0x0, symName: '-[SettingsViewController closeButtonTapped]', symObjAddr: 0x51A, symBinAddr: 0x117CA, symSize: 0x5A }
+  - { offset: 0xBF06, size: 0x4, addend: 0x0, symName: '-[SettingsViewController closeButtonTapped]', symObjAddr: 0x51A, symBinAddr: 0x117CA, symSize: 0x5A }
+  - { offset: 0xBF0A, size: 0x4, addend: 0x0, symName: '-[SettingsViewController saveSettingsAction]', symObjAddr: 0x574, symBinAddr: 0x11824, symSize: 0x35E }
+  - { offset: 0xBF37, size: 0x4, addend: 0x0, symName: '-[SettingsViewController saveSettingsAction]', symObjAddr: 0x574, symBinAddr: 0x11824, symSize: 0x35E }
+  - { offset: 0xBF3B, size: 0x4, addend: 0x0, symName: '___44-[SettingsViewController saveSettingsAction]_block_invoke', symObjAddr: 0x8D2, symBinAddr: 0x11B82, symSize: 0x3C }
+  - { offset: 0xBFA6, size: 0x4, addend: 0x0, symName: '___44-[SettingsViewController saveSettingsAction]_block_invoke', symObjAddr: 0x8D2, symBinAddr: 0x11B82, symSize: 0x3C }
+  - { offset: 0xBFF0, size: 0x4, addend: 0x0, symName: '-[SettingsViewController refreshModelsAction]', symObjAddr: 0x944, symBinAddr: 0x11BC0, symSize: 0x23E }
+  - { offset: 0xBFF4, size: 0x4, addend: 0x0, symName: '___45-[SettingsViewController refreshModelsAction]_block_invoke', symObjAddr: 0xB82, symBinAddr: 0x11DFE, symSize: 0x4FC }
+  - { offset: 0xC032, size: 0x4, addend: 0x0, symName: '___45-[SettingsViewController refreshModelsAction]_block_invoke', symObjAddr: 0xB82, symBinAddr: 0x11DFE, symSize: 0x4FC }
+  - { offset: 0xC036, size: 0x4, addend: 0x0, symName: '___45-[SettingsViewController refreshModelsAction]_block_invoke_2', symObjAddr: 0x107E, symBinAddr: 0x122FA, symSize: 0x144 }
+  - { offset: 0xC0C0, size: 0x4, addend: 0x0, symName: '___45-[SettingsViewController refreshModelsAction]_block_invoke_2', symObjAddr: 0x107E, symBinAddr: 0x122FA, symSize: 0x144 }
+  - { offset: 0xC0C4, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20s24s, symObjAddr: 0x11C2, symBinAddr: 0x1243E, symSize: 0x36 }
+  - { offset: 0xC11B, size: 0x4, addend: 0x0, symName: ___copy_helper_block_e4_20s24s, symObjAddr: 0x11C2, symBinAddr: 0x1243E, symSize: 0x36 }
+  - { offset: 0xC11F, size: 0x4, addend: 0x0, symName: ___destroy_helper_block_e4_20s24s, symObjAddr: 0x11F8, symBinAddr: 0x12474, symSize: 0x24 }
+  - { offset: 0xC13F, size: 0x4, addend: 0x0, symName: ___destroy_helper_block_e4_20s24s, symObjAddr: 0x11F8, symBinAddr: 0x12474, symSize: 0x24 }
+  - { offset: 0xC143, size: 0x4, addend: 0x0, symName: _CGRectMake, symObjAddr: 0x121C, symBinAddr: 0x12498, symSize: 0x42 }
+  - { offset: 0xC15A, size: 0x4, addend: 0x0, symName: _CGRectMake, symObjAddr: 0x121C, symBinAddr: 0x12498, symSize: 0x42 }
+  - { offset: 0xC15E, size: 0x4, addend: 0x0, symName: '-[SettingsViewController showAlertWithTitle:message:]', symObjAddr: 0x125E, symBinAddr: 0x124DA, symSize: 0xF0 }
+  - { offset: 0xC1BD, size: 0x4, addend: 0x0, symName: '-[SettingsViewController showAlertWithTitle:message:]', symObjAddr: 0x125E, symBinAddr: 0x124DA, symSize: 0xF0 }
+  - { offset: 0xC1C1, size: 0x4, addend: 0x0, symName: '-[SettingsViewController numberOfSectionsInTableView:]', symObjAddr: 0x134E, symBinAddr: 0x125CA, symSize: 0x2E }
+  - { offset: 0xC218, size: 0x4, addend: 0x0, symName: '-[SettingsViewController numberOfSectionsInTableView:]', symObjAddr: 0x134E, symBinAddr: 0x125CA, symSize: 0x2E }
+  - { offset: 0xC21C, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:numberOfRowsInSection:]', symObjAddr: 0x137C, symBinAddr: 0x125F8, symSize: 0x6A }
+  - { offset: 0xC25B, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:numberOfRowsInSection:]', symObjAddr: 0x137C, symBinAddr: 0x125F8, symSize: 0x6A }
+  - { offset: 0xC25F, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:titleForHeaderInSection:]', symObjAddr: 0x13E6, symBinAddr: 0x12662, symSize: 0xA0 }
+  - { offset: 0xC2AC, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:titleForHeaderInSection:]', symObjAddr: 0x13E6, symBinAddr: 0x12662, symSize: 0xA0 }
+  - { offset: 0xC2B0, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:titleForFooterInSection:]', symObjAddr: 0x1486, symBinAddr: 0x12702, symSize: 0x7A }
+  - { offset: 0xC2FD, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:titleForFooterInSection:]', symObjAddr: 0x1486, symBinAddr: 0x12702, symSize: 0x7A }
+  - { offset: 0xC34E, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:cellForRowAtIndexPath:]', symObjAddr: 0x1500, symBinAddr: 0x1277C, symSize: 0x944 }
+  - { offset: 0xC352, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:didSelectRowAtIndexPath:]', symObjAddr: 0x1E44, symBinAddr: 0x130C0, symSize: 0xEE }
+  - { offset: 0xC3E5, size: 0x4, addend: 0x0, symName: '-[SettingsViewController tableView:didSelectRowAtIndexPath:]', symObjAddr: 0x1E44, symBinAddr: 0x130C0, symSize: 0xEE }
+  - { offset: 0xC3E9, size: 0x4, addend: 0x0, symName: '-[SettingsViewController delegate]', symObjAddr: 0x1F32, symBinAddr: 0x131AE, symSize: 0x28 }
+  - { offset: 0xC432, size: 0x4, addend: 0x0, symName: '-[SettingsViewController delegate]', symObjAddr: 0x1F32, symBinAddr: 0x131AE, symSize: 0x28 }
+  - { offset: 0xC436, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setDelegate:]', symObjAddr: 0x1F5A, symBinAddr: 0x131D6, symSize: 0x26 }
+  - { offset: 0xC468, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setDelegate:]', symObjAddr: 0x1F5A, symBinAddr: 0x131D6, symSize: 0x26 }
+  - { offset: 0xC46C, size: 0x4, addend: 0x0, symName: '-[SettingsViewController apiKeyField]', symObjAddr: 0x1F80, symBinAddr: 0x131FC, symSize: 0x1C }
+  - { offset: 0xC4A6, size: 0x4, addend: 0x0, symName: '-[SettingsViewController apiKeyField]', symObjAddr: 0x1F80, symBinAddr: 0x131FC, symSize: 0x1C }
+  - { offset: 0xC4AA, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setApiKeyField:]', symObjAddr: 0x1F9C, symBinAddr: 0x13218, symSize: 0x26 }
+  - { offset: 0xC4DC, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setApiKeyField:]', symObjAddr: 0x1F9C, symBinAddr: 0x13218, symSize: 0x26 }
+  - { offset: 0xC4E0, size: 0x4, addend: 0x0, symName: '-[SettingsViewController modelField]', symObjAddr: 0x1FC2, symBinAddr: 0x1323E, symSize: 0x1C }
+  - { offset: 0xC51A, size: 0x4, addend: 0x0, symName: '-[SettingsViewController modelField]', symObjAddr: 0x1FC2, symBinAddr: 0x1323E, symSize: 0x1C }
+  - { offset: 0xC51E, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setModelField:]', symObjAddr: 0x1FDE, symBinAddr: 0x1325A, symSize: 0x26 }
+  - { offset: 0xC550, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setModelField:]', symObjAddr: 0x1FDE, symBinAddr: 0x1325A, symSize: 0x26 }
+  - { offset: 0xC554, size: 0x4, addend: 0x0, symName: '-[SettingsViewController isFetchingModels]', symObjAddr: 0x2004, symBinAddr: 0x13280, symSize: 0x1E }
+  - { offset: 0xC58E, size: 0x4, addend: 0x0, symName: '-[SettingsViewController isFetchingModels]', symObjAddr: 0x2004, symBinAddr: 0x13280, symSize: 0x1E }
+  - { offset: 0xC592, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setIsFetchingModels:]', symObjAddr: 0x2022, symBinAddr: 0x1329E, symSize: 0x24 }
+  - { offset: 0xC5C4, size: 0x4, addend: 0x0, symName: '-[SettingsViewController setIsFetchingModels:]', symObjAddr: 0x2022, symBinAddr: 0x1329E, symSize: 0x24 }
+  - { offset: 0xC5C8, size: 0x4, addend: 0x0, symName: '-[SettingsViewController .cxx_destruct]', symObjAddr: 0x2046, symBinAddr: 0x132C2, symSize: 0x50 }
+  - { offset: 0xC602, size: 0x4, addend: 0x0, symName: '-[SettingsViewController .cxx_destruct]', symObjAddr: 0x2046, symBinAddr: 0x132C2, symSize: 0x50 }
+  - { offset: 0xCE79, size: 0x4, addend: 0x0, symName: _main, symObjAddr: 0x0, symBinAddr: 0x13312, symSize: 0x66 }
+  - { offset: 0xCE82, size: 0x4, addend: 0x0, symName: _main, symObjAddr: 0x0, symBinAddr: 0x13312, symSize: 0x66 }
+...

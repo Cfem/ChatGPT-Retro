@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>StringsTable</key>
+    <string>Root</string>
+    <key>PreferenceSpecifiers</key>
+    <array>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>GOOGLE OAUTH 2.0 (HESAP GİRİŞİ)</string>
+            <key>FooterText</key>
+            <string>Google Cloud Console'dan aldığınız TV/Device Client ID ve Secret'ı buraya yapıştırın.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Client ID</string>
+            <key>Key</key>
+            <string>google_oauth_client_id</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Client Secret</string>
+            <key>Key</key>
+            <string>google_oauth_client_secret</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>İŞLEM BUTONLARI</string>
+            <key>FooterText</key>
+            <string>Yukarıdaki kutucukları doldurduktan sonra bu butonlara dokunarak işlemi doğrudan başlatabilirsiniz.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>IHTTPSpecifier</string>
+            <key>Title</key>
+            <string>📥 Ayarları Uygulamaya Kaydet / Aktar</string>
+            <key>File</key>
+            <string>geminiretro://push-settings</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>IHTTPSpecifier</string>
+            <key>Title</key>
+            <string>🔑 Google ile Giriş Yap (OAuth)</string>
+            <key>File</key>
+            <string>geminiretro://start-oauth</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>IHTTPSpecifier</string>
+            <key>Title</key>
+            <string>🔄 Modelleri Güncelle</string>
+            <key>File</key>
+            <string>geminiretro://update-models</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>GOOGLE AI STUDIO API ANAHTARI</string>
+            <key>FooterText</key>
+            <string>OAuth yerine API anahtarı kullanmak isterseniz buraya yapıştırabilirsiniz.</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>API Key</string>
+            <key>Key</key>
+            <string>GeminiClientApiKey</string>
+            <key>DefaultValue</key>
+            <string></string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSGroupSpecifier</string>
+            <key>Title</key>
+            <string>GEMINI MODELİ</string>
+            <key>FooterText</key>
+            <string>Kullanmak istediğiniz modeli yazın (Örn: gemini-1.5-flash, gemini-1.5-pro).</string>
+        </dict>
+        <dict>
+            <key>Type</key>
+            <string>PSTextFieldSpecifier</string>
+            <key>Title</key>
+            <string>Model</string>
+            <key>Key</key>
+            <string>GeminiClientModel</string>
+            <key>DefaultValue</key>
+            <string>gemini-1.5-flash</string>
+            <key>IsSecure</key>
+            <false/>
+            <key>KeyboardType</key>
+            <string>Alphabet</string>
+            <key>AutocapitalizationType</key>
+            <string>None</string>
+            <key>AutocorrectionType</key>
+            <string>No</string>
+        </dict>
+    </array>
+</dict>
+</plist>

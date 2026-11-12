@@ -20,6 +20,13 @@
 @property (nonatomic, strong) UISwitch *webSearchSwitch;
 @property (nonatomic, strong) UISwitch *codeInterpreterSwitch;
 
+// Advanced Optimizations Controls (Section 6)
+@property (nonatomic, strong) UISwitch *promptCachingSwitch;
+@property (nonatomic, strong) UISwitch *truncateAssistantSwitch;
+@property (nonatomic, strong) UISlider *tokenTurnsSlider;
+@property (nonatomic, strong) UILabel *tokenTurnsValueLabel;
+@property (nonatomic, strong) UISwitch *keywordFilteringSwitch;
+
 @property (nonatomic, assign) BOOL isFetchingModels;
 @property (nonatomic, assign) BOOL isSigningIn;
 
@@ -192,6 +199,39 @@
     _codeInterpreterSwitch.onTintColor = openAIGreen;
     _codeInterpreterSwitch.on = [OpenAIClient sharedClient].enableCodeInterpreter;
     [_codeInterpreterSwitch addTarget:self action:@selector(codeInterpreterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
+    // 6. Advanced Cost Optimization Controls
+    _promptCachingSwitch = [[UISwitch alloc] init];
+    _promptCachingSwitch.onTintColor = openAIGreen;
+    _promptCachingSwitch.on = [OpenAIClient sharedClient].enablePromptCaching;
+    [_promptCachingSwitch addTarget:self action:@selector(promptCachingSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _truncateAssistantSwitch = [[UISwitch alloc] init];
+    _truncateAssistantSwitch.onTintColor = openAIGreen;
+    _truncateAssistantSwitch.on = [OpenAIClient sharedClient].enableTruncateAssistant;
+    [_truncateAssistantSwitch addTarget:self action:@selector(truncateAssistantSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _keywordFilteringSwitch = [[UISwitch alloc] init];
+    _keywordFilteringSwitch.onTintColor = openAIGreen;
+    _keywordFilteringSwitch.on = [OpenAIClient sharedClient].enableKeywordFiltering;
+    [_keywordFilteringSwitch addTarget:self action:@selector(keywordFilteringSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
+    // Eğer anahtar kelime açıksa asistan kırpma devre dışı olsun, ya da tam tersi
+    [self updateAdvancedTogglesMutualExclusion];
+
+    _tokenTurnsSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _tokenTurnsSlider.minimumValue = 1.0f;
+    _tokenTurnsSlider.maximumValue = 20.0f;
+    _tokenTurnsSlider.continuous = YES;
+    _tokenTurnsSlider.minimumTrackTintColor = openAIGreen;
+    _tokenTurnsSlider.value = (float)[OpenAIClient sharedClient].maxHistoryTurns;
+    [_tokenTurnsSlider addTarget:self action:@selector(tokenTurnsSliderChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _tokenTurnsValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _tokenTurnsValueLabel.textAlignment = NSTextAlignmentRight;
+    _tokenTurnsValueLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:13.0];
+    _tokenTurnsValueLabel.textColor = openAIGreen;
+    [self updateTokenTurnsLabelText];
 }
 
 #pragma mark - Dynamic Capability Actions
@@ -270,6 +310,50 @@
     [OpenAIClient sharedClient].enableCodeInterpreter = sender.isOn;
 }
 
+#pragma mark - Advanced Optimizations Handlers
+
+- (void)updateAdvancedTogglesMutualExclusion {
+    if (self.keywordFilteringSwitch.isOn) {
+        self.truncateAssistantSwitch.on = NO;
+        self.truncateAssistantSwitch.enabled = NO;
+        self.keywordFilteringSwitch.enabled = YES;
+    } else if (self.truncateAssistantSwitch.isOn) {
+        self.keywordFilteringSwitch.on = NO;
+        self.keywordFilteringSwitch.enabled = NO;
+        self.truncateAssistantSwitch.enabled = YES;
+    } else {
+        self.truncateAssistantSwitch.enabled = YES;
+        self.keywordFilteringSwitch.enabled = YES;
+    }
+}
+
+- (void)promptCachingSwitchChanged:(UISwitch *)sender {
+    [OpenAIClient sharedClient].enablePromptCaching = sender.isOn;
+}
+
+- (void)truncateAssistantSwitchChanged:(UISwitch *)sender {
+    [OpenAIClient sharedClient].enableTruncateAssistant = sender.isOn;
+    [self updateAdvancedTogglesMutualExclusion];
+}
+
+- (void)keywordFilteringSwitchChanged:(UISwitch *)sender {
+    [OpenAIClient sharedClient].enableKeywordFiltering = sender.isOn;
+    [self updateAdvancedTogglesMutualExclusion];
+}
+
+- (void)updateTokenTurnsLabelText {
+    NSInteger turns = (NSInteger)roundf(self.tokenTurnsSlider.value);
+    NSString *format = LocalizedString(@"turns_count_format");
+    self.tokenTurnsValueLabel.text = [NSString stringWithFormat:format, (long)turns];
+}
+
+- (void)tokenTurnsSliderChanged:(UISlider *)sender {
+    NSInteger snapped = (NSInteger)roundf(sender.value);
+    [sender setValue:(float)snapped animated:NO];
+    [OpenAIClient sharedClient].maxHistoryTurns = snapped;
+    [self updateTokenTurnsLabelText];
+}
+
 - (void)updateLanguageFieldText {
     _languagePickerField.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
 }
@@ -325,6 +409,91 @@
     }
 }
 
+#pragma mark - System Prompts Actions (Apple Style List & Checkmark)
+
+- (void)promptSwitchToggled:(UISwitch *)sender {
+    NSInteger index = sender.tag - 5000;
+    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+    if (index >= 0 && index < (NSInteger)list.count) {
+        NSMutableDictionary *dict = list[index];
+        dict[@"enabled"] = @(sender.isOn);
+        [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+    }
+}
+
+- (void)addNewPromptAction {
+    [self.view endEditing:YES];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"add_prompt_title")
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = LocalizedString(@"prompt_title_placeholder");
+        textField.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+    }];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = LocalizedString(@"prompt_content_placeholder");
+        textField.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *title = alert.textFields[0].text;
+        NSString *content = alert.textFields[1].text;
+        if (title.length == 0 && content.length > 0) {
+            title = content.length > 20 ? [[content substringToIndex:20] stringByAppendingString:@"..."] : content;
+        }
+        if (content.length > 0) {
+            NSMutableDictionary *newPrompt = [@{
+                @"id": [[NSUUID UUID] UUIDString],
+                @"title": title ?: @"Talimat",
+                @"content": content,
+                @"enabled": @YES
+            } mutableCopy];
+
+            NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+            [list addObject:newPrompt];
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationAutomatic];
+        }
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)editPromptAtIndex:(NSInteger)index {
+    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+    if (index < 0 || index >= (NSInteger)list.count) return;
+
+    NSMutableDictionary *item = list[index];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"edit_prompt_title")
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.text = item[@"title"];
+        textField.placeholder = LocalizedString(@"prompt_title_placeholder");
+    }];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.text = item[@"content"];
+        textField.placeholder = LocalizedString(@"prompt_content_placeholder");
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *title = alert.textFields[0].text;
+        NSString *content = alert.textFields[1].text;
+        if (title.length > 0 || content.length > 0) {
+            item[@"title"] = title ?: @"Talimat";
+            item[@"content"] = content ?: @"";
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationNone];
+        }
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 #pragma mark - Actions
 
 - (void)saveSettingsAction {
@@ -332,11 +501,9 @@
 
     NSString *key = self.apiKeyField.text ?: @"";
     NSString *model = self.modelField.text ?: @"gpt-4o-mini";
-    NSString *instruction = self.systemInstructionTextView.text ?: @"";
 
     [[OpenAIClient sharedClient] saveApiKey:key];
     [[OpenAIClient sharedClient] saveSelectedModel:model];
-    [[OpenAIClient sharedClient] saveCustomSystemInstruction:instruction];
 
     if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
         [self.delegate settingsDidUpdate];
@@ -487,7 +654,7 @@
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 7;
+    return 8;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -500,8 +667,12 @@
     }
     if (section == 2) return 2; // Model & Refresh Models
     if (section == 3) return [self capabilityRowTypesForCurrentModel].count; // Dynamic Model Capabilities
-    if (section == 4) return 1; // Custom System Instructions
+    if (section == 4) {
+        // Sistem Talimatları Listesi + 1 satır ("+ Yeni Talimat Ekle")
+        return [OpenAIClient sharedClient].systemPromptsList.count + 1;
+    }
     if (section == 5) return 1; // API Key
+    if (section == 6) return 4; // Advanced Cost Optimizations (Caching, Truncate, Token Turns Slider, Keywords)
     return 2; // System Info
 }
 
@@ -512,11 +683,13 @@
     if (section == 3) return LocalizedString(@"section_capabilities");
     if (section == 4) return LocalizedString(@"section_instructions");
     if (section == 5) return LocalizedString(@"section_apikey");
+    if (section == 6) return LocalizedString(@"section_advanced");
     return LocalizedString(@"section_system");
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 4) return LocalizedString(@"instructions_footer");
+    if (section == 6) return LocalizedString(@"advanced_footer");
     return nil;
 }
 
@@ -532,7 +705,17 @@
         return 44.0;
     }
     if (indexPath.section == 4) {
-        return 180.0; // Genişletilmiş metin kutusu boyutu
+        NSInteger promptCount = [OpenAIClient sharedClient].systemPromptsList.count;
+        if (indexPath.row < promptCount) {
+            return 54.0; // Başlık ve detay için uygun yükseklik
+        }
+        return 44.0; // "+ Yeni Talimat Ekle" satırı
+    }
+    if (indexPath.section == 6) {
+        if (indexPath.row == 2) {
+            return 86.0; // Slider + açıklama + etiket satırı
+        }
+        return 64.0; // 2 satırlı toggle + alt açıklama hücresi
     }
     return 44.0;
 }
@@ -560,7 +743,8 @@
     for (UIView *sub in cell.contentView.subviews) {
         if (sub == self.reasoningEffortSlider || sub == self.reasoningEffortValueLabel ||
             sub == self.temperatureSlider || sub == self.temperatureValueLabel ||
-            sub == self.modelField || sub == self.apiKeyField || sub == self.systemInstructionTextView) {
+            sub == self.modelField || sub == self.apiKeyField || sub == self.systemInstructionTextView ||
+            sub == self.tokenTurnsSlider || sub == self.tokenTurnsValueLabel) {
             [sub removeFromSuperview];
         }
     }
@@ -689,13 +873,32 @@
             cell.accessoryView = self.codeInterpreterSwitch;
         }
     } else if (indexPath.section == 4) {
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
-        CGFloat cellH = cell.contentView.bounds.size.height > 0 ? cell.contentView.bounds.size.height : 180.0;
-        self.systemInstructionTextView.frame = CGRectMake(14, 8, cellW - 28, cellH - 16);
-        self.systemInstructionTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        self.systemInstructionTextView.textContainerInset = UIEdgeInsetsMake(4, 2, 4, 6);
-        [cell.contentView addSubview:self.systemInstructionTextView];
+        NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+        if (indexPath.row < (NSInteger)list.count) {
+            NSMutableDictionary *item = list[indexPath.row];
+            BOOL isEnabled = [item[@"enabled"] boolValue];
+
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            cell.textLabel.text = item[@"title"] ?: @"Talimat";
+            cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
+
+            NSString *content = item[@"content"] ?: @"";
+            NSString *singleLine = [content stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+            cell.detailTextLabel.text = singleLine;
+            cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:13.0];
+            cell.detailTextLabel.textColor = [UIColor grayColor];
+
+            // Apple standart Checkmark / Tik işareti
+            cell.accessoryType = isEnabled ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+        } else {
+            // "+ Yeni Talimat Ekle" satırı
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            cell.textLabel.text = LocalizedString(@"add_prompt_button");
+            cell.textLabel.textColor = openAIGreen;
+            cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
+            cell.detailTextLabel.text = nil;
+            cell.accessoryType = UITableViewCellAccessoryNone;
+        }
     } else if (indexPath.section == 5) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textLabel.text = LocalizedString(@"apikey_label");
@@ -704,6 +907,71 @@
         self.apiKeyField.frame = CGRectMake(labelW, 8, cellW - labelW - 20, 28);
         self.apiKeyField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
         [cell.contentView addSubview:self.apiKeyField];
+    } else if (indexPath.section == 6) {
+        // İLERİ SEVİYE MALİYET VE CONTEXT OPTİMİZASYONLARI
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
+
+        if (indexPath.row == 0) {
+            // 1. Prompt Caching
+            cell.textLabel.numberOfLines = 1;
+            cell.textLabel.text = LocalizedString(@"adv_prompt_caching_title");
+            cell.detailTextLabel.numberOfLines = 2;
+            cell.detailTextLabel.text = LocalizedString(@"adv_prompt_caching_desc");
+            cell.accessoryView = self.promptCachingSwitch;
+            self.promptCachingSwitch.on = [OpenAIClient sharedClient].enablePromptCaching;
+        } else if (indexPath.row == 1) {
+            // 2. Asistan Yanıtlarını Kırp
+            cell.textLabel.numberOfLines = 1;
+            cell.textLabel.text = LocalizedString(@"adv_truncate_assistant_title");
+            cell.detailTextLabel.numberOfLines = 2;
+            cell.detailTextLabel.text = LocalizedString(@"adv_truncate_assistant_desc");
+            cell.accessoryView = self.truncateAssistantSwitch;
+            self.truncateAssistantSwitch.on = [OpenAIClient sharedClient].enableTruncateAssistant;
+        } else if (indexPath.row == 2) {
+            // 3. Token Sayacı / Geçmiş Tur Slider'ı
+            UILabel *titleLbl = [cell.contentView viewWithTag:9003];
+            if (!titleLbl) {
+                titleLbl = [[UILabel alloc] initWithFrame:CGRectMake(16, 6, cellW * 0.55, 20)];
+                titleLbl.tag = 9003;
+                titleLbl.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
+                titleLbl.textColor = [UIColor blackColor];
+                titleLbl.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+                [cell.contentView addSubview:titleLbl];
+            }
+            titleLbl.text = LocalizedString(@"adv_token_counter_title");
+
+            self.tokenTurnsValueLabel.frame = CGRectMake(cellW - 140, 6, 124, 20);
+            self.tokenTurnsValueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+            [self updateTokenTurnsLabelText];
+            [cell.contentView addSubview:self.tokenTurnsValueLabel];
+
+            self.tokenTurnsSlider.frame = CGRectMake(16, 28, cellW - 32, 28);
+            self.tokenTurnsSlider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            [cell.contentView addSubview:self.tokenTurnsSlider];
+
+            UILabel *descLbl = [cell.contentView viewWithTag:9004];
+            if (!descLbl) {
+                descLbl = [[UILabel alloc] initWithFrame:CGRectMake(16, 56, cellW - 32, 24)];
+                descLbl.tag = 9004;
+                descLbl.font = [UIFont fontWithName:@"HelveticaNeue" size:11.0];
+                descLbl.textColor = [UIColor grayColor];
+                descLbl.numberOfLines = 2;
+                descLbl.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+                [cell.contentView addSubview:descLbl];
+            }
+            descLbl.text = LocalizedString(@"adv_token_counter_desc");
+        } else if (indexPath.row == 3) {
+            // 4. Anahtar Kelime Filtreleme
+            cell.textLabel.numberOfLines = 1;
+            cell.textLabel.text = LocalizedString(@"adv_keyword_filtering_title");
+            cell.detailTextLabel.numberOfLines = 2;
+            cell.detailTextLabel.text = LocalizedString(@"adv_keyword_filtering_desc");
+            cell.accessoryView = self.keywordFilteringSwitch;
+            self.keywordFilteringSwitch.on = [OpenAIClient sharedClient].enableKeywordFiltering;
+        }
+
+        [self updateAdvancedTogglesMutualExclusion];
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         if (indexPath.row == 0) {
@@ -712,7 +980,7 @@
             cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:11.0];
         } else {
             cell.textLabel.text = LocalizedString(@"version_label");
-            cell.detailTextLabel.text = @"v1.6.1 (Pure iOS 8 UI)";
+            cell.detailTextLabel.text = @"v1.7.0 (Pure iOS 8 UI)";
         }
     }
 
@@ -742,7 +1010,69 @@
         if (!self.isFetchingModels) {
             [self refreshModelsAction];
         }
+    } else if (indexPath.section == 4) {
+        NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+        if (indexPath.row < (NSInteger)list.count) {
+            // Tıklandığında aktif/pasif (tik) durumunu değiştir
+            NSMutableDictionary *item = list[indexPath.row];
+            BOOL current = [item[@"enabled"] boolValue];
+            item[@"enabled"] = @(!current);
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+        } else {
+            // Yeni Talimat Ekle
+            [self addNewPromptAction];
+        }
     }
+}
+
+#pragma mark - Table View Editing (Swipe to Delete / Edit)
+
+- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 4) {
+        NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
+        return (indexPath.row < count);
+    }
+    return NO;
+}
+
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 4 && editingStyle == UITableViewCellEditingStyleDelete) {
+        NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+        if (indexPath.row < (NSInteger)list.count) {
+            [list removeObjectAtIndex:indexPath.row];
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+        }
+    }
+}
+
+- (NSArray<UITableViewRowAction *> *)tableView:(UITableView *)tableView editActionsForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 4) {
+        NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
+        if (indexPath.row < count) {
+            UITableViewRowAction *deleteAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDestructive
+                                                                                    title:LocalizedString(@"delete_button")
+                                                                                  handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
+                NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+                if (ip.row < (NSInteger)list.count) {
+                    [list removeObjectAtIndex:ip.row];
+                    [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+                    [tableView deleteRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
+                }
+            }];
+
+            UITableViewRowAction *editAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleNormal
+                                                                                  title:LocalizedString(@"edit_prompt_title")
+                                                                                handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
+                [self editPromptAtIndex:ip.row];
+            }];
+            editAction.backgroundColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.8 alpha:1.0];
+
+            return @[deleteAction, editAction];
+        }
+    }
+    return nil;
 }
 
 - (void)dealloc {
