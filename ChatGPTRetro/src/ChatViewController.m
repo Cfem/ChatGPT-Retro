@@ -4,10 +4,10 @@
 #import "OpenAIClient.h"
 #import "SettingsViewController.h"
 #import "ChatGPTLoginModalViewController.h"
+#import "ChatHistoryManager.h"
+#import "ChatHistorySidebarViewController.h"
 
-static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages";
-
-@interface ChatViewController () <SettingsViewControllerDelegate, ChatGPTLoginModalDelegate>
+@interface ChatViewController () <SettingsViewControllerDelegate, ChatGPTLoginModalDelegate, ChatHistorySidebarDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray *messages;
@@ -56,10 +56,9 @@ static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages"
                                                  name:kChatGPTAuthStateDidChangeNotification
                                                object:nil];
 
-    [self loadSavedMessages];
-    if (self.messages.count == 0) {
-        [self addWelcomeMessageIfNeeded];
-    }
+    // Aktif oturumu yükle
+    ChatSession *active = [ChatHistoryManager sharedManager].activeSession;
+    [self loadSession:active];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -85,15 +84,70 @@ static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages"
 }
 
 - (void)setupNavigationItems {
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Temizle"
-                                                                             style:UIBarButtonItemStylePlain
-                                                                            target:self
-                                                                            action:@selector(clearChatTapped)];
+    // Sol: Sohbet Geçmişi / Sidebar Butonu
+    UIBarButtonItem *sidebarBtn = [[UIBarButtonItem alloc] initWithTitle:@"☰ Sohbetler"
+                                                                   style:UIBarButtonItemStylePlain
+                                                                  target:self
+                                                                  action:@selector(openSidebarTapped)];
 
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Ayarlar"
-                                                                              style:UIBarButtonItemStylePlain
-                                                                             target:self
-                                                                             action:@selector(openSettingsTapped)];
+    UIBarButtonItem *clearBtn = [[UIBarButtonItem alloc] initWithTitle:@"Temizle"
+                                                                 style:UIBarButtonItemStylePlain
+                                                                target:self
+                                                                action:@selector(clearChatTapped)];
+
+    self.navigationItem.leftBarButtonItems = @[sidebarBtn, clearBtn];
+
+    // Sağ: Yeni Sohbet (+) ve Ayarlar Butonları
+    UIBarButtonItem *settingsBtn = [[UIBarButtonItem alloc] initWithTitle:@"Ayarlar"
+                                                                    style:UIBarButtonItemStylePlain
+                                                                   target:self
+                                                                   action:@selector(openSettingsTapped)];
+
+    UIBarButtonItem *newChatBtn = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCompose
+                                                                                target:self
+                                                                                action:@selector(newChatTapped)];
+
+    self.navigationItem.rightBarButtonItems = @[settingsBtn, newChatBtn];
+}
+
+- (void)openSidebarTapped {
+    ChatHistorySidebarViewController *sidebar = [[ChatHistorySidebarViewController alloc] init];
+    sidebar.delegate = self;
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:sidebar];
+    nav.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:nav animated:YES completion:nil];
+}
+
+- (void)newChatTapped {
+    ChatSession *newSession = [[ChatHistoryManager sharedManager] createNewSession];
+    [self loadSession:newSession];
+}
+
+#pragma mark - ChatHistorySidebarDelegate
+
+- (void)sidebarDidSelectSession:(ChatSession *)session {
+    [self loadSession:session];
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)sidebarDidRequestNewChat {
+    [self dismissViewControllerAnimated:YES completion:^{
+        [self newChatTapped];
+    }];
+}
+
+- (void)loadSession:(ChatSession *)session {
+    [self.messages removeAllObjects];
+    if (session.messages.count > 0) {
+        [self.messages addObjectsFromArray:session.messages];
+    } else {
+        [self addWelcomeMessageIfNeeded];
+    }
+    self.title = session.title ?: @"ChatGPT";
+    [self.tableView reloadData];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self scrollToBottomAnimated:NO];
+    });
 }
 
 - (void)openSettingsTapped {
@@ -213,61 +267,39 @@ static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages"
     }
 }
 
-- (void)saveLast10Messages {
-    NSMutableArray *toSave = [NSMutableArray array];
-    // Hoş geldiniz mesajını hariç tutarak gerçek sohbetleri filtrele
-    NSMutableArray *realMessages = [NSMutableArray array];
-    for (ChatMessage *msg in self.messages) {
-        if ([msg.text containsString:@"iPad Mini 1 (iOS 8.4)"]) continue;
-        [realMessages addObject:msg];
-    }
-
-    NSInteger startIdx = 0;
-    if (realMessages.count > 10) {
-        startIdx = realMessages.count - 10;
-    }
-
-    for (NSInteger i = startIdx; i < realMessages.count; i++) {
-        ChatMessage *msg = realMessages[i];
-        [toSave addObject:[msg dictionaryRepresentation]];
-    }
-
-    [[NSUserDefaults standardUserDefaults] setObject:toSave forKey:kSavedChatMessagesKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
-- (void)loadSavedMessages {
-    NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kSavedChatMessagesKey];
-    if (saved && [saved isKindOfClass:[NSArray class]] && saved.count > 0) {
-        for (NSDictionary *dict in saved) {
-            ChatMessage *msg = [ChatMessage messageFromDictionary:dict];
-            if (msg) {
-                [self.messages addObject:msg];
-            }
+- (void)saveCurrentSessionState {
+    ChatSession *active = [ChatHistoryManager sharedManager].activeSession;
+    if (active) {
+        [active.messages removeAllObjects];
+        for (ChatMessage *m in self.messages) {
+            if ([m.text containsString:@"iPad Mini 1 (iOS 8.4)"]) continue;
+            [active.messages addObject:m];
         }
-        [self.tableView reloadData];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self scrollToBottomAnimated:NO];
-        });
+        [[ChatHistoryManager sharedManager] saveSessions];
     }
 }
 
 - (void)addWelcomeMessageIfNeeded {
     NSString *welcome = @"👋 ChatGPT Retro'ya Hoş Geldiniz!\n\n"
                         @"Bu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle (GPT-4o, GPT-6 Luna vb.) doğrudan sohbet etmeniz için uyarlandı.\n\n"
-                        @"🌐 Sol alttaki Web Arama butonuyla canlı güncel internet bilgilerini açıp kapatabilirsiniz.";
+                        @"💬 Sol üstteki '☰ Sohbetler' butonundan geçmiş son 10 konuşmanıza ulaşabilir veya '+' ile yeni bir sohbet başlatabilirsiniz.";
     [self.messages addObject:[ChatMessage messageWithText:welcome sender:ChatMessageSenderAssistant]];
     [self.tableView reloadData];
 }
 
 - (void)clearChatTapped {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Sohbeti Temizle"
-                                                                   message:@"Tüm mesaj geçmişi silinsin mi?"
+                                                                   message:@"Mevcut konuşmanın mesajları silinsin mi?"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Temizle" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         [self.messages removeAllObjects];
-        [[NSUserDefaults standardUserDefaults] removeObjectForKey:kSavedChatMessagesKey];
-        [[NSUserDefaults standardUserDefaults] synchronize];
+        ChatSession *active = [ChatHistoryManager sharedManager].activeSession;
+        if (active) {
+            [active.messages removeAllObjects];
+            active.title = @"Yeni Sohbet";
+            self.title = @"Yeni Sohbet";
+            [[ChatHistoryManager sharedManager] saveSessions];
+        }
         [self addWelcomeMessageIfNeeded];
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
@@ -343,7 +375,10 @@ static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages"
 
     ChatMessage *userMsg = [ChatMessage messageWithText:rawText sender:ChatMessageSenderUser];
     [self.messages addObject:userMsg];
-    [self saveLast10Messages];
+
+    [[ChatHistoryManager sharedManager] updateActiveSessionWithUserMessage:rawText];
+    self.title = [ChatHistoryManager sharedManager].activeSession.title ?: @"ChatGPT";
+    [self saveCurrentSessionState];
 
     [self.tableView reloadData];
     [self scrollToBottomAnimated:YES];
@@ -370,7 +405,7 @@ static NSString *const kSavedChatMessagesKey = @"ChatGPTRetro_SavedChatMessages"
             [self.messages addObject:assistantChat];
         }
 
-        [self saveLast10Messages];
+        [self saveCurrentSessionState];
         [self.tableView reloadData];
         [self scrollToBottomAnimated:YES];
     }];
