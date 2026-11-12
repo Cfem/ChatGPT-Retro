@@ -13,6 +13,7 @@ NSString *const kChatGPTAuthStateDidChangeNotification = @"ChatGPTAuthStateDidCh
 
 static NSString *const kOpenAIApiKeyDefaultsKey      = @"OpenAIClientApiKey";
 static NSString *const kOpenAIModelDefaultsKey       = @"OpenAIClientModel";
+static NSString *const kOpenAICustomInstructionKey   = @"OpenAIClientCustomInstruction";
 static NSString *const kOpenAICachedModelsKey        = @"OpenAIClientCachedModels";
 
 // SIWC Storage Keys
@@ -100,6 +101,7 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
         _apiKey = [defaults stringForKey:kOpenAIApiKeyDefaultsKey] ?: @"";
         _selectedModel = [defaults stringForKey:kOpenAIModelDefaultsKey] ?: kDefaultModel;
+        _customSystemInstruction = [defaults stringForKey:kOpenAICustomInstructionKey] ?: @"";
 
         // 1. Prepare App's Host ID (urn:uuid:...) per SIWC DevKit spec
         _hostId = [defaults stringForKey:kSIWCHostIdKey];
@@ -131,6 +133,12 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
 - (void)saveSelectedModel:(NSString *)model {
     _selectedModel = [model stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: kDefaultModel;
     [[NSUserDefaults standardUserDefaults] setObject:_selectedModel forKey:kOpenAIModelDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)saveCustomSystemInstruction:(NSString *)instruction {
+    _customSystemInstruction = [instruction stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
+    [[NSUserDefaults standardUserDefaults] setObject:_customSystemInstruction forKey:kOpenAICustomInstructionKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
@@ -777,6 +785,9 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     NSString *urlString = @"https://api.openai.com/v1/responses";
 
     NSMutableString *instructions = [NSMutableString stringWithString:@"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."];
+    if (self.customSystemInstruction.length > 0) {
+        [instructions appendFormat:@"\n\n[Kullanıcı Özel Sistem Talimatı ve Tercihleri]:\n%@", self.customSystemInstruction];
+    }
     if (webSearch) {
         [instructions appendString:@" Web araması aktif. Güncel bilgileri ve kaynakları belirt."];
     }
@@ -923,6 +934,10 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     NSString *instructionRole = isModern ? @"developer" : @"system";
     NSMutableString *systemPrompt = [NSMutableString stringWithString:@"Sen iOS 8 iPad Mini üzerinde çalışan retro ve şık ChatGPTRetro asistanısın. Türkçe, net, kibar ve yardımcı yanıtlar ver."];
     
+    if (self.customSystemInstruction.length > 0) {
+        [systemPrompt appendFormat:@"\n\n[Kullanıcı Özel Sistem Talimatı ve Tercihleri]:\n%@", self.customSystemInstruction];
+    }
+
     if (webSearch) {
         [systemPrompt appendString:@" Web araması (canlı internet bilgisi) aktif. En güncel bilgilere göre cevap ver ve kaynakları/tarihleri belirt."];
     }

@@ -76,7 +76,7 @@
     } else if ([OpenAIClient sharedClient].apiKey.length > 10) {
         authStatus = @" [API Key Hazır]";
     }
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.3)", model ?: @"gpt-4o-mini", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.4)", model ?: @"gpt-4o-mini", authStatus];
 }
 
 - (void)setupNavigationItems {

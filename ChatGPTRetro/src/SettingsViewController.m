@@ -6,6 +6,7 @@
 
 @property (nonatomic, strong) UITextField *apiKeyField;
 @property (nonatomic, strong) UITextField *modelField;
+@property (nonatomic, strong) UITextView *systemInstructionTextView;
 @property (nonatomic, assign) BOOL isFetchingModels;
 @property (nonatomic, assign) BOOL isSigningIn;
 
@@ -69,6 +70,12 @@
     _modelField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     _modelField.autocorrectionType = UITextAutocorrectionTypeNo;
     _modelField.clearButtonMode = UITextFieldViewModeWhileEditing;
+
+    // 3. Özel Sistem Talimatı (Bellek / Custom Instructions)
+    _systemInstructionTextView = [[UITextView alloc] initWithFrame:CGRectZero];
+    _systemInstructionTextView.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
+    _systemInstructionTextView.backgroundColor = [UIColor clearColor];
+    _systemInstructionTextView.text = [OpenAIClient sharedClient].customSystemInstruction;
 }
 
 - (void)closeButtonTapped {
@@ -83,9 +90,11 @@
 
     NSString *key = self.apiKeyField.text ?: @"";
     NSString *model = self.modelField.text ?: @"gpt-4o-mini";
+    NSString *instruction = self.systemInstructionTextView.text ?: @"";
 
     [[OpenAIClient sharedClient] saveApiKey:key];
     [[OpenAIClient sharedClient] saveSelectedModel:model];
+    [[OpenAIClient sharedClient] saveCustomSystemInstruction:instruction];
 
     if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
         [self.delegate settingsDidUpdate];
@@ -239,7 +248,7 @@
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 4;
+    return 5;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -248,17 +257,19 @@
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
             return 4; // Hesap (Connected), Plan Durumu, Manage Usage, Disconnect
         }
-        return 2; // Continue with ChatGPT (Safari), Manuel Link Yapıştır (Yedek)
+        return 2; // Continue with ChatGPT (Safari/QR), Manuel Link Yapıştır (Yedek)
     }
     if (section == 1) return 2; // Model & Refresh Models
-    if (section == 2) return 1; // API Key
+    if (section == 2) return 1; // Custom System Instruction (Bellek / Özel Talimat)
+    if (section == 3) return 1; // API Key
     return 2; // Sistem Bilgisi
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"SIGN IN WITH CHATGPT (PLAN KULLANIMI)";
     if (section == 1) return @"CHATGPT MODELİ";
-    if (section == 2) return @"OPENAI API ANAHTARI (OPSİYONEL)";
+    if (section == 2) return @"ÖZEL SİSTEM TALİMATI & BELLEK (CUSTOM INSTRUCTIONS)";
+    if (section == 3) return @"OPENAI API ANAHTARI (OPSİYONEL)";
     return @"SİSTEM BİLGİSİ";
 }
 
@@ -267,11 +278,19 @@
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
             return [NSString stringWithFormat:@"ChatGPT planınız bağlı (Client ID: %@). İstekleriniz doğrudan ChatGPT Plus/Pro planınız üzerinden tamamlanır.", [OpenAIClient sharedClient].issuedClientId];
         }
-        return @"ChatGPT Plus veya Pro hesabınızla API anahtarına ihtiyaç duymadan doğrudan Safari üzerinden giriş yapabilirsiniz.";
+        return @"ChatGPT Plus veya Pro hesabınızla API anahtarına ihtiyaç duymadan QR / Safari üzerinden giriş yapabilirsiniz.";
     }
     if (section == 1) return @"Hesabınızda kullanılabilir modelleri görmek için 'Modelleri Canlı Güncelle' butonuna dokunun.";
-    if (section == 2) return @"ChatGPT hesabı yerine doğrudan Platform API anahtarıyla (sk-...) kullanmak isterseniz buraya girebilirsiniz.";
+    if (section == 2) return @"ChatGPT'nin sizi tanıması ve bağlamınızı hiç unutmamasını istediğiniz bilgileri (adınız, mesleğiniz, cevap tarzı, kurallar vb.) buraya yazın. Tüm sohbetlerde otomatik uygulanır.";
+    if (section == 3) return @"ChatGPT hesabı yerine doğrudan Platform API anahtarıyla (sk-...) kullanmak isterseniz buraya girebilirsiniz.";
     return nil;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 2) {
+        return 96.0; // Text view for custom instructions
+    }
+    return 44.0;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -345,6 +364,10 @@
         }
     } else if (indexPath.section == 2) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.systemInstructionTextView.frame = CGRectMake(16, 6, w - 32, 84);
+        [cell.contentView addSubview:self.systemInstructionTextView];
+    } else if (indexPath.section == 3) {
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textLabel.text = @"API Key";
         self.apiKeyField.frame = CGRectMake(110, 8, w - 126, 28);
         [cell.contentView addSubview:self.apiKeyField];
@@ -356,7 +379,7 @@
             cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:11.0];
         } else {
             cell.textLabel.text = @"Sürüm";
-            cell.detailTextLabel.text = @"v1.3 (SIWC & API Key)";
+            cell.detailTextLabel.text = @"v1.4 (Custom Instructions & Memory)";
         }
     }
 
