@@ -12,6 +12,14 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 @property (nonatomic, copy) NSString *selectedModel;
 @property (nonatomic, copy) NSString *customSystemInstruction;
 
+// Model Capabilities & Extra Request Parameters (Per OpenAI Responses/Completions Docs)
+// reasoningEffortLevel: 0=none, 1=minimal, 2=low, 3=medium, 4=high, 5=xhigh, 6=max
+@property (nonatomic, assign) NSInteger reasoningEffortLevel;
+@property (nonatomic, assign) BOOL enableReasoningSummary;
+@property (nonatomic, assign) BOOL enableWebSearch;
+@property (nonatomic, assign) BOOL enableCodeInterpreter;
+@property (nonatomic, assign) float modelTemperature;
+
 // Sign in with ChatGPT (SIWC) OAuth 2.0 + PKCE Properties
 @property (nonatomic, copy, readonly) NSString *hostId;
 @property (nonatomic, copy, readonly) NSString *issuedClientId;
@@ -26,6 +34,13 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 - (void)saveApiKey:(NSString *)apiKey;
 - (void)saveSelectedModel:(NSString *)model;
 - (void)saveCustomSystemInstruction:(NSString *)instruction;
+
+// Model Capability Inspection (Dynamic UI Helpers)
+- (BOOL)supportsReasoningEffortForModel:(NSString *)model;
+- (BOOL)supportsWebSearchForModel:(NSString *)model;
+- (BOOL)supportsCodeInterpreterForModel:(NSString *)model;
+- (BOOL)supportsTemperatureForModel:(NSString *)model;
+- (NSString *)reasoningEffortApiValueForLevel:(NSInteger)level;
 
 - (BOOL)isChatGPTAccountLinked;
 - (BOOL)isAuthenticated;

@@ -10,6 +10,16 @@
 @property (nonatomic, strong) UITextView *systemInstructionTextView;
 @property (nonatomic, strong) UITextField *languagePickerField;
 @property (nonatomic, strong) UIPickerView *languagePicker;
+
+// Dynamic Model Capability Controls (Section 3)
+@property (nonatomic, strong) UISlider *reasoningEffortSlider;
+@property (nonatomic, strong) UILabel *reasoningEffortValueLabel;
+@property (nonatomic, strong) UISwitch *reasoningSummarySwitch;
+@property (nonatomic, strong) UISlider *temperatureSlider;
+@property (nonatomic, strong) UILabel *temperatureValueLabel;
+@property (nonatomic, strong) UISwitch *webSearchSwitch;
+@property (nonatomic, strong) UISwitch *codeInterpreterSwitch;
+
 @property (nonatomic, assign) BOOL isFetchingModels;
 @property (nonatomic, assign) BOOL isSigningIn;
 
@@ -49,21 +59,26 @@
     [self setupFields];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    self.webSearchSwitch.on = [OpenAIClient sharedClient].enableWebSearch;
+    [self.tableView reloadData];
+}
+
 - (void)languageDidChange:(NSNotification *)note {
     dispatch_async(dispatch_get_main_queue(), ^{
         self.title = LocalizedString(@"settings_title");
         self.navigationItem.leftBarButtonItem.title = LocalizedString(@"close_button");
         self.navigationItem.rightBarButtonItem.title = LocalizedString(@"save_button");
         [self updateLanguageFieldText];
+        [self updateReasoningEffortLabelText];
         [self.languagePicker reloadAllComponents];
 
-        // Toolbar üzerindeki Tamam butonunu da güncelle
         UIToolbar *tb = (UIToolbar *)self.languagePickerField.inputAccessoryView;
         if ([tb isKindOfClass:[UIToolbar class]] && tb.items.count > 1) {
             tb.items.lastObject.title = LocalizedString(@"ok_button");
         }
 
-        // languagePickerField self.view üzerinde olduğu için tableView reloadData çarkı kapatmaz!
         [self.tableView reloadData];
     });
 }
@@ -79,6 +94,8 @@
 }
 
 - (void)setupFields {
+    UIColor *openAIGreen = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
+
     // 1. Language Picker Field & Accessory Toolbar (iOS classic bottom wheel, hidden trigger)
     _languagePicker = [[UIPickerView alloc] init];
     _languagePicker.dataSource = self;
@@ -113,7 +130,7 @@
     _apiKeyField.autocorrectionType = UITextAutocorrectionTypeNo;
     _apiKeyField.clearButtonMode = UITextFieldViewModeWhileEditing;
 
-    // 3. Model
+    // 3. Model (Dinamik güncelleme için UIControlEventEditingChanged bağlı)
     _modelField = [[UITextField alloc] initWithFrame:CGRectZero];
     _modelField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _modelField.placeholder = @"gpt-4o-mini";
@@ -122,13 +139,135 @@
     _modelField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     _modelField.autocorrectionType = UITextAutocorrectionTypeNo;
     _modelField.clearButtonMode = UITextFieldViewModeWhileEditing;
+    _modelField.delegate = self;
+    [_modelField addTarget:self action:@selector(modelFieldEditingChanged:) forControlEvents:UIControlEventEditingChanged];
 
-    // 4. Custom System Instructions (Daha geniş, uzun metinler için uygun)
+    // 4. Custom System Instructions
     _systemInstructionTextView = [[UITextView alloc] initWithFrame:CGRectZero];
     _systemInstructionTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _systemInstructionTextView.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
     _systemInstructionTextView.backgroundColor = [UIColor clearColor];
     _systemInstructionTextView.text = [OpenAIClient sharedClient].customSystemInstruction;
+
+    // 5. Dynamic Model Capability Controls (Sliders & Switches)
+    _reasoningEffortSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _reasoningEffortSlider.minimumValue = 0.0f;
+    _reasoningEffortSlider.maximumValue = 6.0f;
+    _reasoningEffortSlider.continuous = YES;
+    _reasoningEffortSlider.minimumTrackTintColor = openAIGreen;
+    _reasoningEffortSlider.value = (float)[OpenAIClient sharedClient].reasoningEffortLevel;
+    [_reasoningEffortSlider addTarget:self action:@selector(reasoningEffortSliderChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _reasoningEffortValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _reasoningEffortValueLabel.textAlignment = NSTextAlignmentRight;
+    _reasoningEffortValueLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:13.0];
+    _reasoningEffortValueLabel.textColor = openAIGreen;
+    [self updateReasoningEffortLabelText];
+
+    _reasoningSummarySwitch = [[UISwitch alloc] init];
+    _reasoningSummarySwitch.onTintColor = openAIGreen;
+    _reasoningSummarySwitch.on = [OpenAIClient sharedClient].enableReasoningSummary;
+    [_reasoningSummarySwitch addTarget:self action:@selector(reasoningSummarySwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _temperatureSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _temperatureSlider.minimumValue = 0.0f;
+    _temperatureSlider.maximumValue = 2.0f;
+    _temperatureSlider.continuous = YES;
+    _temperatureSlider.minimumTrackTintColor = openAIGreen;
+    _temperatureSlider.value = [OpenAIClient sharedClient].modelTemperature;
+    [_temperatureSlider addTarget:self action:@selector(temperatureSliderChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _temperatureValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _temperatureValueLabel.textAlignment = NSTextAlignmentRight;
+    _temperatureValueLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:13.0];
+    _temperatureValueLabel.textColor = openAIGreen;
+    _temperatureValueLabel.text = [NSString stringWithFormat:@"%.1f", [OpenAIClient sharedClient].modelTemperature];
+
+    _webSearchSwitch = [[UISwitch alloc] init];
+    _webSearchSwitch.onTintColor = openAIGreen;
+    _webSearchSwitch.on = [OpenAIClient sharedClient].enableWebSearch;
+    [_webSearchSwitch addTarget:self action:@selector(webSearchSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
+    _codeInterpreterSwitch = [[UISwitch alloc] init];
+    _codeInterpreterSwitch.onTintColor = openAIGreen;
+    _codeInterpreterSwitch.on = [OpenAIClient sharedClient].enableCodeInterpreter;
+    [_codeInterpreterSwitch addTarget:self action:@selector(codeInterpreterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+}
+
+#pragma mark - Dynamic Capability Actions
+
+- (NSString *)activeModelString {
+    NSString *m = [self.modelField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (m.length > 0) return m;
+    return [OpenAIClient sharedClient].selectedModel ?: @"gpt-4o-mini";
+}
+
+- (NSArray<NSString *> *)capabilityRowTypesForCurrentModel {
+    NSString *model = [self activeModelString];
+    OpenAIClient *client = [OpenAIClient sharedClient];
+    NSMutableArray *rows = [NSMutableArray array];
+
+    if ([client supportsReasoningEffortForModel:model]) {
+        [rows addObject:@"reasoning_effort"];
+        [rows addObject:@"reasoning_summary"];
+    } else if ([client supportsTemperatureForModel:model]) {
+        [rows addObject:@"temperature"];
+    }
+
+    if ([client supportsWebSearchForModel:model]) {
+        [rows addObject:@"web_search"];
+    }
+    if ([client supportsCodeInterpreterForModel:model]) {
+        [rows addObject:@"code_interpreter"];
+    }
+    return rows;
+}
+
+- (void)modelFieldEditingChanged:(UITextField *)sender {
+    [[OpenAIClient sharedClient] saveSelectedModel:sender.text];
+    // Sadece 3. seksiyonu (Model Ek Özellikleri) dinamik yenile, klavyeyi kapatma
+    [UIView performWithoutAnimation:^{
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3] withRowAnimation:UITableViewRowAnimationNone];
+    }];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
+}
+
+- (void)updateReasoningEffortLabelText {
+    NSInteger level = (NSInteger)roundf(self.reasoningEffortSlider.value);
+    NSArray *keys = @[@"effort_none", @"effort_minimal", @"effort_low", @"effort_medium", @"effort_high", @"effort_xhigh", @"effort_max"];
+    if (level >= 0 && level < keys.count) {
+        self.reasoningEffortValueLabel.text = LocalizedString(keys[level]);
+    }
+}
+
+- (void)reasoningEffortSliderChanged:(UISlider *)sender {
+    NSInteger snapped = (NSInteger)roundf(sender.value);
+    [sender setValue:(float)snapped animated:NO];
+    [OpenAIClient sharedClient].reasoningEffortLevel = snapped;
+    [self updateReasoningEffortLabelText];
+}
+
+- (void)reasoningSummarySwitchChanged:(UISwitch *)sender {
+    [OpenAIClient sharedClient].enableReasoningSummary = sender.isOn;
+}
+
+- (void)temperatureSliderChanged:(UISlider *)sender {
+    float rounded = roundf(sender.value * 10.0f) / 10.0f;
+    [OpenAIClient sharedClient].modelTemperature = rounded;
+    self.temperatureValueLabel.text = [NSString stringWithFormat:@"%.1f", rounded];
+}
+
+- (void)webSearchSwitchChanged:(UISwitch *)sender {
+    [OpenAIClient sharedClient].enableWebSearch = sender.isOn;
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
+}
+
+- (void)codeInterpreterSwitchChanged:(UISwitch *)sender {
+    [OpenAIClient sharedClient].enableCodeInterpreter = sender.isOn;
 }
 
 - (void)updateLanguageFieldText {
@@ -324,6 +463,7 @@
             [picker addAction:[UIAlertAction actionWithTitle:m style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
                 self.modelField.text = m;
                 [[OpenAIClient sharedClient] saveSelectedModel:m];
+                [self.tableView reloadData];
                 if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
                     [self.delegate settingsDidUpdate];
                 }
@@ -347,21 +487,21 @@
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 6;
+    return 7;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 1; // Language selection
     if (section == 1) {
-        // Sign in with ChatGPT (SIWC)
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
             return 4; // Connected, Status, Manage, Disconnect
         }
         return 2; // Continue with ChatGPT, Paste URL
     }
     if (section == 2) return 2; // Model & Refresh Models
-    if (section == 3) return 1; // Custom System Instructions
-    if (section == 4) return 1; // API Key
+    if (section == 3) return [self capabilityRowTypesForCurrentModel].count; // Dynamic Model Capabilities
+    if (section == 4) return 1; // Custom System Instructions
+    if (section == 5) return 1; // API Key
     return 2; // System Info
 }
 
@@ -369,26 +509,41 @@
     if (section == 0) return LocalizedString(@"section_language");
     if (section == 1) return LocalizedString(@"section_siwc");
     if (section == 2) return LocalizedString(@"section_model");
-    if (section == 3) return LocalizedString(@"section_instructions");
-    if (section == 4) return LocalizedString(@"section_apikey");
+    if (section == 3) return LocalizedString(@"section_capabilities");
+    if (section == 4) return LocalizedString(@"section_instructions");
+    if (section == 5) return LocalizedString(@"section_apikey");
     return LocalizedString(@"section_system");
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 3) return LocalizedString(@"instructions_footer");
+    if (section == 4) return LocalizedString(@"instructions_footer");
     return nil;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.section == 3) {
-        // Genişletilmiş metin kutusu boyutu (uzun sistem talimatları için)
-        return 180.0;
+        NSArray *rows = [self capabilityRowTypesForCurrentModel];
+        if (indexPath.row < rows.count) {
+            NSString *type = rows[indexPath.row];
+            if ([type isEqualToString:@"reasoning_effort"] || [type isEqualToString:@"temperature"]) {
+                return 74.0; // Slider + etiket satırı
+            }
+        }
+        return 44.0;
+    }
+    if (indexPath.section == 4) {
+        return 180.0; // Genişletilmiş metin kutusu boyutu
     }
     return 44.0;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    NSString *cellId = [NSString stringWithFormat:@"Cell_%ld_%ld_%d", (long)indexPath.section, (long)indexPath.row, [[OpenAIClient sharedClient] isChatGPTAccountLinked]];
+    NSString *extraKey = @"";
+    if (indexPath.section == 3) {
+        NSArray *rows = [self capabilityRowTypesForCurrentModel];
+        if (indexPath.row < rows.count) extraKey = rows[indexPath.row];
+    }
+    NSString *cellId = [NSString stringWithFormat:@"Cell_%ld_%ld_%@_%d", (long)indexPath.section, (long)indexPath.row, extraKey, [[OpenAIClient sharedClient] isChatGPTAccountLinked]];
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
@@ -396,16 +551,24 @@
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.accessoryView = nil;
+    cell.textLabel.text = nil;
     cell.textLabel.textColor = [UIColor blackColor];
     cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:16.0];
     cell.detailTextLabel.text = nil;
     cell.detailTextLabel.textColor = [UIColor grayColor];
 
+    for (UIView *sub in cell.contentView.subviews) {
+        if (sub == self.reasoningEffortSlider || sub == self.reasoningEffortValueLabel ||
+            sub == self.temperatureSlider || sub == self.temperatureValueLabel ||
+            sub == self.modelField || sub == self.apiKeyField || sub == self.systemInstructionTextView) {
+            [sub removeFromSuperview];
+        }
+    }
+
     CGFloat w = tableView.bounds.size.width;
     UIColor *openAIGreen = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
 
     if (indexPath.section == 0) {
-        // iOS Klasik Alttan Çarklı Dil Seçici Hücresi (Salt okunur etiket, seçilip silinemez)
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         cell.textLabel.text = LocalizedString(@"language_label");
         cell.detailTextLabel.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
@@ -468,15 +631,72 @@
             }
         }
     } else if (indexPath.section == 3) {
+        // Dinamik Model Ek Özellikleri & Araçlar (Reasoning Slider / Apple Toggle Switchler)
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        // Uzatılmış sistem talimatı alanı (sağdan ve soldan simetrik marjinli)
+        NSArray *rows = [self capabilityRowTypesForCurrentModel];
+        NSString *rowType = (indexPath.row < rows.count) ? rows[indexPath.row] : @"";
+        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
+
+        if ([rowType isEqualToString:@"reasoning_effort"]) {
+            UILabel *titleLbl = [cell.contentView viewWithTag:9001];
+            if (!titleLbl) {
+                titleLbl = [[UILabel alloc] initWithFrame:CGRectMake(16, 8, cellW * 0.55, 22)];
+                titleLbl.tag = 9001;
+                titleLbl.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
+                titleLbl.textColor = [UIColor blackColor];
+                titleLbl.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+                [cell.contentView addSubview:titleLbl];
+            }
+            titleLbl.text = LocalizedString(@"cap_reasoning_effort");
+
+            self.reasoningEffortValueLabel.frame = CGRectMake(cellW - 156, 8, 140, 22);
+            self.reasoningEffortValueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+            [self updateReasoningEffortLabelText];
+            [cell.contentView addSubview:self.reasoningEffortValueLabel];
+
+            self.reasoningEffortSlider.frame = CGRectMake(16, 36, cellW - 32, 30);
+            self.reasoningEffortSlider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            [cell.contentView addSubview:self.reasoningEffortSlider];
+        } else if ([rowType isEqualToString:@"reasoning_summary"]) {
+            cell.textLabel.text = LocalizedString(@"cap_reasoning_summary");
+            cell.accessoryView = self.reasoningSummarySwitch;
+        } else if ([rowType isEqualToString:@"temperature"]) {
+            UILabel *titleLbl = [cell.contentView viewWithTag:9002];
+            if (!titleLbl) {
+                titleLbl = [[UILabel alloc] initWithFrame:CGRectMake(16, 8, cellW * 0.65, 22)];
+                titleLbl.tag = 9002;
+                titleLbl.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
+                titleLbl.textColor = [UIColor blackColor];
+                titleLbl.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+                [cell.contentView addSubview:titleLbl];
+            }
+            titleLbl.text = LocalizedString(@"cap_temperature");
+
+            self.temperatureValueLabel.frame = CGRectMake(cellW - 96, 8, 80, 22);
+            self.temperatureValueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+            [cell.contentView addSubview:self.temperatureValueLabel];
+
+            self.temperatureSlider.frame = CGRectMake(16, 36, cellW - 32, 30);
+            self.temperatureSlider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            [cell.contentView addSubview:self.temperatureSlider];
+        } else if ([rowType isEqualToString:@"web_search"]) {
+            cell.textLabel.text = LocalizedString(@"cap_web_search");
+            self.webSearchSwitch.on = [OpenAIClient sharedClient].enableWebSearch;
+            cell.accessoryView = self.webSearchSwitch;
+        } else if ([rowType isEqualToString:@"code_interpreter"]) {
+            cell.textLabel.text = LocalizedString(@"cap_code_interpreter");
+            self.codeInterpreterSwitch.on = [OpenAIClient sharedClient].enableCodeInterpreter;
+            cell.accessoryView = self.codeInterpreterSwitch;
+        }
+    } else if (indexPath.section == 4) {
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
         CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
         CGFloat cellH = cell.contentView.bounds.size.height > 0 ? cell.contentView.bounds.size.height : 180.0;
         self.systemInstructionTextView.frame = CGRectMake(14, 8, cellW - 28, cellH - 16);
         self.systemInstructionTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         self.systemInstructionTextView.textContainerInset = UIEdgeInsetsMake(4, 2, 4, 6);
         [cell.contentView addSubview:self.systemInstructionTextView];
-    } else if (indexPath.section == 4) {
+    } else if (indexPath.section == 5) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textLabel.text = LocalizedString(@"apikey_label");
         CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;

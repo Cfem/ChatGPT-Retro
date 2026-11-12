@@ -117,7 +117,20 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"model_label": @"Model",
         @"apikey_label": @"API Anahtarı",
         @"host_id_label": @"Cihaz Kimliği",
-        @"version_label": @"Sürüm"
+        @"version_label": @"Sürüm",
+        @"section_capabilities": @"MODEL EK ÖZELLİKLERİ VE ARAÇLAR",
+        @"cap_reasoning_effort": @"Düşünme Eforu (Reasoning)",
+        @"cap_reasoning_summary": @"Düşünme Özeti (Summary)",
+        @"cap_web_search": @"Canlı İnternet Araması",
+        @"cap_code_interpreter": @"Python Kod Yorumlayıcı",
+        @"cap_temperature": @"Yaratıcılık (Temperature)",
+        @"effort_none": @"Yok (None)",
+        @"effort_minimal": @"Minimal",
+        @"effort_low": @"Düşük (Low)",
+        @"effort_medium": @"Orta (Medium)",
+        @"effort_high": @"Yüksek (High)",
+        @"effort_xhigh": @"Çok Yüksek (xHigh)",
+        @"effort_max": @"Maksimum (Max)"
     };
 
     _enDict = @{
@@ -174,7 +187,20 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
         @"model_label": @"Model",
         @"apikey_label": @"API Key",
         @"host_id_label": @"Device ID",
-        @"version_label": @"Version"
+        @"version_label": @"Version",
+        @"section_capabilities": @"MODEL CAPABILITIES & TOOLS",
+        @"cap_reasoning_effort": @"Reasoning Effort",
+        @"cap_reasoning_summary": @"Reasoning Summary",
+        @"cap_web_search": @"Live Web Search",
+        @"cap_code_interpreter": @"Python Code Interpreter",
+        @"cap_temperature": @"Creativity (Temperature)",
+        @"effort_none": @"None",
+        @"effort_minimal": @"Minimal",
+        @"effort_low": @"Low",
+        @"effort_medium": @"Medium",
+        @"effort_high": @"High",
+        @"effort_xhigh": @"xHigh",
+        @"effort_max": @"Max"
     };
 }
 

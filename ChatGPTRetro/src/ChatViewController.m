@@ -416,6 +416,7 @@
         [self closeSidebar];
     }
     [self ensureSettingsViews];
+    [self.settingsVC.tableView reloadData];
 
     UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
     CGRect winBounds = targetWindow.bounds;
@@ -482,6 +483,8 @@
 
 - (void)settingsDidUpdate {
     [self updateTitleWithModel];
+    self.isWebSearchActive = [OpenAIClient sharedClient].enableWebSearch;
+    [self updateWebSearchButtonAppearance];
 }
 
 - (void)settingsDidRequestClose {
@@ -573,8 +576,7 @@
 
 - (void)toggleWebSearch {
     self.isWebSearchActive = !self.isWebSearchActive;
-    [[NSUserDefaults standardUserDefaults] setBool:self.isWebSearchActive forKey:@"enable_chatgpt_web_search"];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    [OpenAIClient sharedClient].enableWebSearch = self.isWebSearchActive;
 
     [UIView animateWithDuration:0.2 animations:^{
         [self updateWebSearchButtonAppearance];

@@ -103,6 +103,20 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
         _selectedModel = [defaults stringForKey:kOpenAIModelDefaultsKey] ?: kDefaultModel;
         _customSystemInstruction = [defaults stringForKey:kOpenAICustomInstructionKey] ?: @"";
 
+        if ([defaults objectForKey:@"OpenAI_ReasoningEffortLevel"] != nil) {
+            _reasoningEffortLevel = [defaults integerForKey:@"OpenAI_ReasoningEffortLevel"];
+        } else {
+            _reasoningEffortLevel = 3; // Default: medium
+        }
+        _enableReasoningSummary = [defaults boolForKey:@"OpenAI_EnableReasoningSummary"];
+        _enableWebSearch = [defaults boolForKey:@"enable_chatgpt_web_search"];
+        _enableCodeInterpreter = [defaults boolForKey:@"OpenAI_EnableCodeInterpreter"];
+        if ([defaults objectForKey:@"OpenAI_ModelTemperature"] != nil) {
+            _modelTemperature = [defaults floatForKey:@"OpenAI_ModelTemperature"];
+        } else {
+            _modelTemperature = 0.7f;
+        }
+
         // 1. Prepare App's Host ID (urn:uuid:...) per SIWC DevKit spec
         _hostId = [defaults stringForKey:kSIWCHostIdKey];
         if (!_hostId || ![_hostId hasPrefix:@"urn:uuid:"]) {
@@ -140,6 +154,68 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     _customSystemInstruction = [instruction stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] ?: @"";
     [[NSUserDefaults standardUserDefaults] setObject:_customSystemInstruction forKey:kOpenAICustomInstructionKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setReasoningEffortLevel:(NSInteger)reasoningEffortLevel {
+    if (reasoningEffortLevel < 0) reasoningEffortLevel = 0;
+    if (reasoningEffortLevel > 6) reasoningEffortLevel = 6;
+    _reasoningEffortLevel = reasoningEffortLevel;
+    [[NSUserDefaults standardUserDefaults] setInteger:_reasoningEffortLevel forKey:@"OpenAI_ReasoningEffortLevel"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setEnableReasoningSummary:(BOOL)enableReasoningSummary {
+    _enableReasoningSummary = enableReasoningSummary;
+    [[NSUserDefaults standardUserDefaults] setBool:_enableReasoningSummary forKey:@"OpenAI_EnableReasoningSummary"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setEnableWebSearch:(BOOL)enableWebSearch {
+    _enableWebSearch = enableWebSearch;
+    [[NSUserDefaults standardUserDefaults] setBool:_enableWebSearch forKey:@"enable_chatgpt_web_search"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setEnableCodeInterpreter:(BOOL)enableCodeInterpreter {
+    _enableCodeInterpreter = enableCodeInterpreter;
+    [[NSUserDefaults standardUserDefaults] setBool:_enableCodeInterpreter forKey:@"OpenAI_EnableCodeInterpreter"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)setModelTemperature:(float)modelTemperature {
+    if (modelTemperature < 0.0f) modelTemperature = 0.0f;
+    if (modelTemperature > 2.0f) modelTemperature = 2.0f;
+    _modelTemperature = modelTemperature;
+    [[NSUserDefaults standardUserDefaults] setFloat:_modelTemperature forKey:@"OpenAI_ModelTemperature"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (NSString *)reasoningEffortApiValueForLevel:(NSInteger)level {
+    NSArray *levels = @[@"none", @"minimal", @"low", @"medium", @"high", @"xhigh", @"max"];
+    if (level >= 0 && level < levels.count) {
+        return levels[level];
+    }
+    return @"medium";
+}
+
+- (BOOL)supportsReasoningEffortForModel:(NSString *)model {
+    return [self isModernOrReasoningModel:model];
+}
+
+- (BOOL)supportsWebSearchForModel:(NSString *)model {
+    NSString *m = [model lowercaseString];
+    if ([m hasPrefix:@"gpt-3.5"] || [m isEqualToString:@"gpt-4"] || [m hasPrefix:@"gpt-4-0"]) return NO;
+    return YES;
+}
+
+- (BOOL)supportsCodeInterpreterForModel:(NSString *)model {
+    NSString *m = [model lowercaseString];
+    if ([m hasPrefix:@"gpt-3.5"]) return NO;
+    return YES;
+}
+
+- (BOOL)supportsTemperatureForModel:(NSString *)model {
+    return ![self isModernOrReasoningModel:model];
 }
 
 - (BOOL)isChatGPTAccountLinked {
@@ -827,8 +903,32 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     payloadDict[@"store"] = @NO;
     payloadDict[@"stream"] = @YES;
 
-    if (webSearch) {
-        payloadDict[@"tools"] = @[ @{ @"type": @"web_search" } ];
+    // 1. Reasoning Effort & Reasoning Summary (Responses API spec: reasoning: { effort: "...", summary: "auto" })
+    if ([self supportsReasoningEffortForModel:model]) {
+        NSMutableDictionary *reasoningDict = [NSMutableDictionary dictionary];
+        reasoningDict[@"effort"] = [self reasoningEffortApiValueForLevel:self.reasoningEffortLevel];
+        if (self.enableReasoningSummary) {
+            reasoningDict[@"summary"] = @"auto";
+        }
+        payloadDict[@"reasoning"] = reasoningDict;
+    } else if ([self supportsTemperatureForModel:model]) {
+        payloadDict[@"temperature"] = @(self.modelTemperature);
+    }
+
+    // 2. Hosted Tools (web_search, code_interpreter)
+    NSMutableArray *toolsArray = [NSMutableArray array];
+    BOOL effectiveWebSearch = webSearch || self.enableWebSearch;
+    if (effectiveWebSearch && [self supportsWebSearchForModel:model]) {
+        [toolsArray addObject:@{ @"type": @"web_search" }];
+    }
+    if (self.enableCodeInterpreter && [self supportsCodeInterpreterForModel:model]) {
+        [toolsArray addObject:@{
+            @"type": @"code_interpreter",
+            @"container": @{ @"type": @"auto" }
+        }];
+    }
+    if (toolsArray.count > 0) {
+        payloadDict[@"tools"] = toolsArray;
     }
 
     NSData *bodyData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
@@ -848,8 +948,12 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
             return;
         }
 
-        if (statusCode == 400 && webSearch) {
+        if (statusCode == 400 && (payloadDict[@"tools"] || payloadDict[@"reasoning"])) {
             [payloadDict removeObjectForKey:@"tools"];
+            if (payloadDict[@"reasoning"]) {
+                // Eğer model none/max gibi uç bir değeri desteklemiyorsa güvenli medium'a veya parametresiz haline düş
+                [payloadDict removeObjectForKey:@"reasoning"];
+            }
             NSData *fallbackBody = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
             [self performCurlRequestToURL:urlString method:@"POST" headers:headers body:fallbackBody completion:^(NSData *fData, NSInteger fStatus, NSError *fErr) {
                 if (fErr) {
@@ -978,14 +1082,19 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
     payloadDict[@"model"] = model;
     payloadDict[@"messages"] = messages;
 
-    if (webSearch) {
-        payloadDict[@"tools"] = @[
-            @{ @"type": @"web_search" }
-        ];
+    if ([self supportsReasoningEffortForModel:model]) {
+        payloadDict[@"reasoning_effort"] = [self reasoningEffortApiValueForLevel:self.reasoningEffortLevel];
+    } else if ([self supportsTemperatureForModel:model]) {
+        payloadDict[@"temperature"] = @(self.modelTemperature);
     }
 
-    if (!isModern) {
-        payloadDict[@"temperature"] = @0.7;
+    NSMutableArray *toolsArray = [NSMutableArray array];
+    BOOL effectiveWebSearch = webSearch || self.enableWebSearch;
+    if (effectiveWebSearch && [self supportsWebSearchForModel:model]) {
+        [toolsArray addObject:@{ @"type": @"web_search" }];
+    }
+    if (toolsArray.count > 0) {
+        payloadDict[@"tools"] = toolsArray;
     }
 
     NSData *bodyData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
@@ -1006,8 +1115,9 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
             return;
         }
 
-        if (statusCode == 400 && webSearch) {
+        if (statusCode == 400 && (payloadDict[@"tools"] || payloadDict[@"reasoning_effort"])) {
             [payloadDict removeObjectForKey:@"tools"];
+            [payloadDict removeObjectForKey:@"reasoning_effort"];
             NSData *fallbackData = [NSJSONSerialization dataWithJSONObject:payloadDict options:0 error:nil];
             [self performCurlRequestToURL:urlString method:@"POST" headers:headers body:fallbackData completion:^(NSData *fData, NSInteger fStatus, NSError *fErr) {
                 if (fErr) {
