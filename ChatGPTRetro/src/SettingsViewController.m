@@ -173,7 +173,11 @@
 
 - (void)closeButtonTapped {
     [self.view endEditing:YES];
-    [self dismissViewControllerAnimated:YES completion:nil];
+    if ([self.delegate respondsToSelector:@selector(settingsDidRequestClose)]) {
+        [self.delegate settingsDidRequestClose];
+    } else {
+        [self dismissViewControllerAnimated:YES completion:nil];
+    }
 }
 
 #pragma mark - Actions
@@ -196,7 +200,11 @@
     NSString *msg = [NSString stringWithFormat:@"%@\n\n• Model: %@", LocalizedString(@"saved_alert_msg"), model];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"saved_alert_title") message:msg preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        [self dismissViewControllerAnimated:YES completion:nil];
+        if ([self.delegate respondsToSelector:@selector(settingsDidRequestClose)]) {
+            [self.delegate settingsDidRequestClose];
+        } else {
+            [self dismissViewControllerAnimated:YES completion:nil];
+        }
     }]];
     [self presentViewController:alert animated:YES completion:nil];
 }
@@ -396,8 +404,10 @@
         cell.textLabel.text = LocalizedString(@"language_label");
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
-        CGFloat labelWidth = 140.0;
-        self.languagePickerField.frame = CGRectMake(labelWidth, 8, w - labelWidth - 36, 28);
+        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
+        CGFloat labelWidth = 135.0;
+        self.languagePickerField.frame = CGRectMake(labelWidth, 8, cellW - labelWidth - 36, 28);
+        self.languagePickerField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
         [cell.contentView addSubview:self.languagePickerField];
     } else if (indexPath.section == 1) {
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
@@ -437,8 +447,10 @@
         if (indexPath.row == 0) {
             cell.selectionStyle = UITableViewCellSelectionStyleNone;
             cell.textLabel.text = LocalizedString(@"model_label");
+            CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
             CGFloat labelW = 100.0;
-            self.modelField.frame = CGRectMake(labelW, 8, w - labelW - 16, 28);
+            self.modelField.frame = CGRectMake(labelW, 8, cellW - labelW - 20, 28);
+            self.modelField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
             [cell.contentView addSubview:self.modelField];
         } else {
             if (self.isFetchingModels) {
@@ -454,14 +466,20 @@
         }
     } else if (indexPath.section == 3) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        // Uzatılmış sistem talimatı alanı
-        self.systemInstructionTextView.frame = CGRectMake(16, 8, w - 32, 164);
+        // Uzatılmış sistem talimatı alanı (sağdan ve soldan simetrik marjinli)
+        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
+        CGFloat cellH = cell.contentView.bounds.size.height > 0 ? cell.contentView.bounds.size.height : 180.0;
+        self.systemInstructionTextView.frame = CGRectMake(14, 8, cellW - 28, cellH - 16);
+        self.systemInstructionTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        self.systemInstructionTextView.textContainerInset = UIEdgeInsetsMake(4, 2, 4, 6);
         [cell.contentView addSubview:self.systemInstructionTextView];
     } else if (indexPath.section == 4) {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textLabel.text = LocalizedString(@"apikey_label");
-        CGFloat labelW = 110.0;
-        self.apiKeyField.frame = CGRectMake(labelW, 8, w - labelW - 16, 28);
+        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
+        CGFloat labelW = 115.0;
+        self.apiKeyField.frame = CGRectMake(labelW, 8, cellW - labelW - 20, 28);
+        self.apiKeyField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
         [cell.contentView addSubview:self.apiKeyField];
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;

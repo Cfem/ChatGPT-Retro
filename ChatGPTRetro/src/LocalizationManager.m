@@ -65,7 +65,7 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
 - (void)setupDictionaries {
     _trDict = @{
         @"app_title": @"ChatGPT",
-        @"sidebar_chats": @"Sohbetler",
+        @"sidebar_chats": @"☰ Sohbetler",
         @"settings_title": @"Ayarlar",
         @"new_chat_button": @"+ Yeni Sohbet",
         @"new_chat_title": @"Yeni Sohbet",
@@ -122,7 +122,7 @@ static NSString *const kAppLanguageDefaultsKey = @"AppSelectedLanguageSetting";
 
     _enDict = @{
         @"app_title": @"ChatGPT",
-        @"sidebar_chats": @"Chats",
+        @"sidebar_chats": @"☰ Chats",
         @"settings_title": @"Settings",
         @"new_chat_button": @"+ New Chat",
         @"new_chat_title": @"New Chat",

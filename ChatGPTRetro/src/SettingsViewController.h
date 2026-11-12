@@ -2,6 +2,8 @@
 
 @protocol SettingsViewControllerDelegate <NSObject>
 - (void)settingsDidUpdate;
+@optional
+- (void)settingsDidRequestClose;
 @end
 
 @interface SettingsViewController : UITableViewController <UITextFieldDelegate>
