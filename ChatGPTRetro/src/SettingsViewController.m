@@ -44,15 +44,9 @@
     [super viewDidLoad];
     self.title = LocalizedString(@"settings_title");
 
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"close_button")
-                                                                             style:UIBarButtonItemStylePlain
-                                                                            target:self
-                                                                            action:@selector(closeButtonTapped)];
-
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"save_button")
-                                                                               style:UIBarButtonItemStyleDone
-                                                                              target:self
-                                                                              action:@selector(saveSettingsAction)];
+    // "Kapat" ve "Kaydet" butonları kaldırıldı (Dışarıya/karanlık alana dokunulduğunda otomatik kaydedilip kapanır)
+    self.navigationItem.leftBarButtonItem = nil;
+    self.navigationItem.rightBarButtonItem = nil;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(authStateDidChange:)
@@ -412,60 +406,67 @@
 
 #pragma mark - System Prompts Actions (Apple Style List & Checkmark)
 
-- (void)promptCheckButtonTapped:(UIButton *)sender {
-    NSInteger index = sender.tag - 6000;
-    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
-    if (index >= 0 && index < (NSInteger)list.count) {
-        NSMutableDictionary *dict = list[index];
-        BOOL current = [dict[@"enabled"] boolValue];
-        dict[@"enabled"] = @(!current);
-        [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-        [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:index inSection:4]] withRowAnimation:UITableViewRowAnimationNone];
-    }
-}
-
 - (void)addNewPromptAction {
     [self.view endEditing:YES];
-    NSMutableDictionary *newPrompt = [@{
-        @"id": [[NSUUID UUID] UUIDString],
-        @"content": @"",
-        @"enabled": @YES
-    } mutableCopy];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"add_prompt_title")
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleAlert];
 
-    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
-    [list addObject:newPrompt];
-    [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationAutomatic];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = LocalizedString(@"prompt_content_placeholder");
+        textField.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+    }];
 
-    // Yeni eklenen satırdaki TextView'e klavye odağını ver
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSIndexPath *newIndexPath = [NSIndexPath indexPathForRow:list.count - 1 inSection:4];
-        [self.tableView scrollToRowAtIndexPath:newIndexPath atScrollPosition:UITableViewScrollPositionMiddle animated:YES];
-        UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:newIndexPath];
-        UITextView *tv = (UITextView *)[cell.contentView viewWithTag:7000 + (list.count - 1)];
-        [tv becomeFirstResponder];
-    });
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *content = alert.textFields[0].text;
+        if (content.length > 0) {
+            NSMutableDictionary *newPrompt = [@{
+                @"id": [[NSUUID UUID] UUIDString],
+                @"content": content,
+                @"enabled": @YES
+            } mutableCopy];
+
+            NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+            [list addObject:newPrompt];
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationAutomatic];
+        }
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)promptTextViewDidChange:(UITextView *)textView {
-    NSInteger index = textView.tag - 7000;
+- (void)editPromptAtIndex:(NSInteger)index {
     NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
-    if (index >= 0 && index < (NSInteger)list.count) {
-        NSMutableDictionary *dict = list[index];
-        dict[@"content"] = textView.text ?: @"";
-        [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-    }
-}
+    if (index < 0 || index >= (NSInteger)list.count) return;
 
-- (void)textViewDidChange:(UITextView *)textView {
-    if (textView.tag >= 7000) {
-        [self promptTextViewDidChange:textView];
-    }
+    NSMutableDictionary *item = list[index];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"edit_prompt_title")
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.text = item[@"content"] ?: @"";
+        textField.placeholder = LocalizedString(@"prompt_content_placeholder");
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *content = alert.textFields[0].text;
+        if (content.length > 0) {
+            item[@"content"] = content;
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationNone];
+        }
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Actions
 
-- (void)saveSettingsAction {
+- (void)saveCurrentSettingsSilently {
     [self.view endEditing:YES];
 
     NSString *key = self.apiKeyField.text ?: @"";
@@ -477,7 +478,12 @@
     if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
         [self.delegate settingsDidUpdate];
     }
+}
 
+- (void)saveSettingsAction {
+    [self saveCurrentSettingsSilently];
+
+    NSString *model = self.modelField.text ?: @"gpt-4o-mini";
     NSString *msg = [NSString stringWithFormat:@"%@\n\n• Model: %@", LocalizedString(@"saved_alert_msg"), model];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"saved_alert_title") message:msg preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -676,7 +682,17 @@
     if (indexPath.section == 4) {
         NSInteger promptCount = [OpenAIClient sharedClient].systemPromptsList.count;
         if (indexPath.row < promptCount) {
-            return 110.0; // Scroll yapılabilen geniş TextView kutusu boyutu
+            NSDictionary *item = [OpenAIClient sharedClient].systemPromptsList[indexPath.row];
+            NSString *content = item[@"content"] ?: @"";
+            // iPad ekran genişliğine göre yazının tam yüksekliğini dinamik hesapla
+            CGFloat cellW = tableView.bounds.size.width > 0 ? tableView.bounds.size.width : 500.0;
+            CGFloat textW = cellW - 60.0; // Kenar boşlukları ve tik alanı
+            CGRect rect = [content boundingRectWithSize:CGSizeMake(textW, CGFLOAT_MAX)
+                                                options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading
+                                             attributes:@{NSFontAttributeName: [UIFont fontWithName:@"HelveticaNeue" size:15.0]}
+                                                context:nil];
+            CGFloat calculatedH = ceilf(rect.size.height) + 24.0;
+            return MAX(calculatedH, 44.0);
         }
         return 44.0; // "+ Yeni Talimat Ekle" satırı
     }
@@ -841,49 +857,23 @@
             NSMutableDictionary *item = list[indexPath.row];
             BOOL isEnabled = [item[@"enabled"] boolValue];
 
-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = nil;
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            cell.textLabel.text = item[@"content"] ?: @"";
+            cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
+            cell.textLabel.numberOfLines = 0; // Bütün metni tam gösterir, kesilmez
+            cell.textLabel.lineBreakMode = NSLineBreakByWordWrapping;
+            cell.textLabel.textColor = [UIColor blackColor];
             cell.detailTextLabel.text = nil;
 
-            // 1. Sol tarafa Apple standart Checkmark / Tik butonu
-            UIButton *checkBtn = (UIButton *)[cell.contentView viewWithTag:6000 + indexPath.row];
-            if (!checkBtn) {
-                checkBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-                checkBtn.tag = 6000 + indexPath.row;
-                checkBtn.frame = CGRectMake(8, 35, 36, 40);
-                checkBtn.titleLabel.font = [UIFont systemFontOfSize:22.0];
-                [checkBtn addTarget:self action:@selector(promptCheckButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-                [cell.contentView addSubview:checkBtn];
-            }
-            [checkBtn setTitle:(isEnabled ? @"✓" : @"○") forState:UIControlStateNormal];
-            [checkBtn setTitleColor:(isEnabled ? openAIGreen : [UIColor lightGrayColor]) forState:UIControlStateNormal];
-
-            // 2. Sağ tarafa başlık içermeyen, direkt metni gösteren ve scroll yapılabilen UITextView
-            CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
-            UITextView *tv = (UITextView *)[cell.contentView viewWithTag:7000 + indexPath.row];
-            if (!tv) {
-                tv = [[UITextView alloc] initWithFrame:CGRectMake(46, 6, cellW - 56, 98)];
-                tv.tag = 7000 + indexPath.row;
-                tv.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-                tv.backgroundColor = [UIColor colorWithWhite:0.97 alpha:1.0];
-                tv.layer.cornerRadius = 6.0;
-                tv.layer.borderWidth = 0.5;
-                tv.layer.borderColor = [UIColor colorWithWhite:0.85 alpha:1.0].CGColor;
-                tv.clipsToBounds = YES;
-                tv.scrollEnabled = YES;
-                tv.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-                tv.delegate = (id<UITextViewDelegate>)self;
-                [cell.contentView addSubview:tv];
-            } else {
-                tv.frame = CGRectMake(46, 6, cellW - 56, 98);
-            }
-            tv.text = item[@"content"] ?: @"";
+            // Apple standart Checkmark / Tik işareti
+            cell.accessoryType = isEnabled ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
         } else {
             // "+ Yeni Talimat Ekle" satırı
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
             cell.textLabel.text = LocalizedString(@"add_prompt_button");
             cell.textLabel.textColor = openAIGreen;
             cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
+            cell.textLabel.numberOfLines = 1;
             cell.detailTextLabel.text = nil;
             cell.accessoryType = UITableViewCellAccessoryNone;
         }
@@ -940,8 +930,15 @@
             [self refreshModelsAction];
         }
     } else if (indexPath.section == 4) {
-        NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
-        if (indexPath.row >= count) {
+        NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+        if (indexPath.row < (NSInteger)list.count) {
+            // Yazının neresine tıklanırsa tıklansın tik durumunu değiştir
+            NSMutableDictionary *item = list[indexPath.row];
+            BOOL current = [item[@"enabled"] boolValue];
+            item[@"enabled"] = @(!current);
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+        } else {
             // Yeni Talimat Ekle
             [self addNewPromptAction];
         }
@@ -977,6 +974,7 @@
     if (indexPath.section == 4) {
         NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
         if (indexPath.row < count) {
+            // 1. Silme Aksiyonu (Türkçe/İngilizce "Sil" / "Delete")
             UITableViewRowAction *deleteAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDestructive
                                                                                     title:LocalizedString(@"delete_button")
                                                                                   handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
@@ -988,7 +986,15 @@
                 }
             }];
 
-            return @[deleteAction];
+            // 2. Düzenle Aksiyonu (Mavi Apple Stili)
+            UITableViewRowAction *editAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleNormal
+                                                                                  title:LocalizedString(@"edit_prompt_title")
+                                                                                handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
+                [self editPromptAtIndex:ip.row];
+            }];
+            editAction.backgroundColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.8 alpha:1.0];
+
+            return @[deleteAction, editAction];
         }
     }
     return nil;
