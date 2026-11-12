@@ -10,6 +10,7 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 
 @property (nonatomic, copy) NSString *apiKey;
 @property (nonatomic, copy) NSString *selectedModel;
+@property (nonatomic, copy) NSString *customSystemInstruction;
 
 // Sign in with ChatGPT (SIWC) OAuth 2.0 + PKCE Properties
 @property (nonatomic, copy, readonly) NSString *hostId;
@@ -24,6 +25,7 @@ extern NSString *const kChatGPTAuthStateDidChangeNotification;
 
 - (void)saveApiKey:(NSString *)apiKey;
 - (void)saveSelectedModel:(NSString *)model;
+- (void)saveCustomSystemInstruction:(NSString *)instruction;
 
 - (BOOL)isChatGPTAccountLinked;
 - (BOOL)isAuthenticated;
