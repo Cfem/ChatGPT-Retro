@@ -172,20 +172,12 @@ static size_t CurlWriteCallback(void *contents, size_t size, size_t nmemb, void 
 - (void)setEnableTruncateAssistant:(BOOL)enableTruncateAssistant {
     _enableTruncateAssistant = enableTruncateAssistant;
     [[NSUserDefaults standardUserDefaults] setBool:enableTruncateAssistant forKey:@"Adv_EnableTruncateAssistant"];
-    if (enableTruncateAssistant) {
-        _enableKeywordFiltering = NO;
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"Adv_EnableKeywordFiltering"];
-    }
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 - (void)setEnableKeywordFiltering:(BOOL)enableKeywordFiltering {
     _enableKeywordFiltering = enableKeywordFiltering;
     [[NSUserDefaults standardUserDefaults] setBool:enableKeywordFiltering forKey:@"Adv_EnableKeywordFiltering"];
-    if (enableKeywordFiltering) {
-        _enableTruncateAssistant = NO;
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"Adv_EnableTruncateAssistant"];
-    }
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 

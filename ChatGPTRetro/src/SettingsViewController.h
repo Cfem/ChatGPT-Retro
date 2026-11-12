@@ -10,4 +10,6 @@
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;
 
+- (void)saveCurrentSettingsSilently;
+
 @end

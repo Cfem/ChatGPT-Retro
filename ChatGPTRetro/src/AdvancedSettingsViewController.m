@@ -41,8 +41,6 @@
     _keywordFilteringSwitch.on = [OpenAIClient sharedClient].enableKeywordFiltering;
     [_keywordFilteringSwitch addTarget:self action:@selector(keywordFilteringChanged:) forControlEvents:UIControlEventValueChanged];
 
-    [self updateMutualExclusion];
-
     _tokenTurnsSlider = [[UISlider alloc] initWithFrame:CGRectZero];
     _tokenTurnsSlider.minimumValue = 1.0f;
     _tokenTurnsSlider.maximumValue = 20.0f;
@@ -58,33 +56,16 @@
     [self updateTokenTurnsLabelText];
 }
 
-- (void)updateMutualExclusion {
-    if (self.keywordFilteringSwitch.isOn) {
-        self.truncateAssistantSwitch.on = NO;
-        self.truncateAssistantSwitch.enabled = NO;
-        self.keywordFilteringSwitch.enabled = YES;
-    } else if (self.truncateAssistantSwitch.isOn) {
-        self.keywordFilteringSwitch.on = NO;
-        self.keywordFilteringSwitch.enabled = NO;
-        self.truncateAssistantSwitch.enabled = YES;
-    } else {
-        self.truncateAssistantSwitch.enabled = YES;
-        self.keywordFilteringSwitch.enabled = YES;
-    }
-}
-
 - (void)promptCachingChanged:(UISwitch *)sender {
     [OpenAIClient sharedClient].enablePromptCaching = sender.isOn;
 }
 
 - (void)truncateAssistantChanged:(UISwitch *)sender {
     [OpenAIClient sharedClient].enableTruncateAssistant = sender.isOn;
-    [self updateMutualExclusion];
 }
 
 - (void)keywordFilteringChanged:(UISwitch *)sender {
     [OpenAIClient sharedClient].enableKeywordFiltering = sender.isOn;
-    [self updateMutualExclusion];
 }
 
 - (void)updateTokenTurnsLabelText {

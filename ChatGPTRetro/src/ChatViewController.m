@@ -454,6 +454,11 @@
         return;
     }
 
+    // Ayarlar çekmecesi kapanırken (karanlık alana tıklama veya kapatma) yapılan tüm değişiklikleri otomatik kaydet
+    if ([self.settingsVC respondsToSelector:@selector(saveCurrentSettingsSilently)]) {
+        [self.settingsVC performSelector:@selector(saveCurrentSettingsSilently)];
+    }
+
     UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
     CGRect winBounds = targetWindow.bounds;
     CGFloat setWidth = [self settingsWidth];
