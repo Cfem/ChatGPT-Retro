@@ -92,10 +92,6 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return LocalizedString(@"adv_prompt_caching_title");
-    if (section == 1) return LocalizedString(@"adv_truncate_assistant_title");
-    if (section == 2) return LocalizedString(@"adv_token_counter_title");
-    if (section == 3) return LocalizedString(@"adv_keyword_filtering_title");
     return nil;
 }
 
