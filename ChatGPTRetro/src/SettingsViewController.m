@@ -680,17 +680,35 @@
     return NO;
 }
 
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 2 && editingStyle == UITableViewCellEditingStyleDelete) {
+- (void)confirmAndDeletePromptAtIndexPath:(NSIndexPath *)indexPath {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"prompt_delete_confirm_title")
+                                                                   message:LocalizedString(@"prompt_delete_confirm_msg")
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button")
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"delete_button")
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(UIAlertAction *action) {
         NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
         if (indexPath.row < (NSInteger)list.count) {
             [list removeObjectAtIndex:indexPath.row];
             [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-            [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+            [self.tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
             if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
                 [self.delegate settingsDidUpdate];
             }
         }
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 2 && editingStyle == UITableViewCellEditingStyleDelete) {
+        [self confirmAndDeletePromptAtIndexPath:indexPath];
     }
 }
 
@@ -698,19 +716,10 @@
     if (indexPath.section == 2) {
         NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
         if (indexPath.row < count) {
-            // Kullanıcı isteği: "düzenle yazısı kaldırılcak ve sağ tarafta sadece kırmızı sil olucak"
             UITableViewRowAction *deleteAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDestructive
                                                                                     title:LocalizedString(@"delete_button")
                                                                                   handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
-                NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
-                if (ip.row < (NSInteger)list.count) {
-                    [list removeObjectAtIndex:ip.row];
-                    [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-                    [tableView deleteRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
-                    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                        [self.delegate settingsDidUpdate];
-                    }
-                }
+                [self confirmAndDeletePromptAtIndexPath:ip];
             }];
             return @[deleteAction];
         }
