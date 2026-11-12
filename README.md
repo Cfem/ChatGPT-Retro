@@ -3,7 +3,8 @@
 A lightweight ChatGPT client designed for legacy iOS devices (iOS 8+).
 
 > **Developer Note:** This project was developed without prior coding knowledge, built entirely with the assistance of Artificial Intelligence (AI pair-programming). It was primarily built and tested on an iPad tablet; iPhone compatibility is implemented but has not been extensively tested.
-> Human Sentence: Using AI to use AI, what the world has become.
+
+Human Sentence: Using AI to use AI, what the world has become.
 
 ---
 
