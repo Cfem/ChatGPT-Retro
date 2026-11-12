@@ -476,9 +476,14 @@
             cell.detailTextLabel.textColor = [UIColor grayColor];
             cell.detailTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
 
-            // Kullanıcı isteği: "(i) işareti ile değil sağa ok ile olsun"
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            cell.accessoryView = nil;
+            // Yaklaşım B: Sağ tarafta detay sayfasına giden sağa ok butonu
+            UIButton *arrowBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+            arrowBtn.frame = CGRectMake(0, 0, 44, 44);
+            arrowBtn.tag = 1000 + indexPath.row;
+            [arrowBtn setImage:[self disclosureArrowImage] forState:UIControlStateNormal];
+            [arrowBtn addTarget:self action:@selector(instructionInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+            cell.accessoryView = arrowBtn;
+            cell.accessoryType = UITableViewCellAccessoryNone;
         } else {
             // "+ Yeni Talimat Ekle" satırı
             cell.textLabel.text = LocalizedString(@"add_prompt_button");
@@ -560,6 +565,29 @@
     return img;
 }
 
+- (UIImage *)disclosureArrowImage {
+    static UIImage *img = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(14, 18), NO, 0.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        [[UIColor colorWithWhite:0.75 alpha:1.0] setStroke];
+        CGContextSetLineWidth(ctx, 2.0);
+        CGContextSetLineCap(ctx, kCGLineCapRound);
+        CGContextSetLineJoin(ctx, kCGLineJoinRound);
+
+        CGContextBeginPath(ctx);
+        CGContextMoveToPoint(ctx, 3, 2);
+        CGContextAddLineToPoint(ctx, 10, 9);
+        CGContextAddLineToPoint(ctx, 3, 16);
+        CGContextStrokePath(ctx);
+
+        img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+    });
+    return img;
+}
+
 - (void)togglePromptCheckmarkButton:(UIButton *)sender {
     NSInteger index = sender.tag - 7777;
     NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
@@ -614,8 +642,15 @@
     } else if (indexPath.section == 2) {
         NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
         if (indexPath.row < (NSInteger)list.count) {
-            // Tıklandığında detay sayfasına sağa ok ile git
-            [self openInstructionDetailAtIndex:indexPath.row];
+            // Yaklaşım B: Satırın herhangi bir yerine tıklayınca tik durumu değişir
+            NSMutableDictionary *item = list[indexPath.row];
+            BOOL current = [item[@"enabled"] boolValue];
+            item[@"enabled"] = @(!current);
+            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
+            [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+            if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+                [self.delegate settingsDidUpdate];
+            }
         } else {
             // "+ Yeni Talimat Ekle" satırına tıklandığında sağa giden yeni talimat sayfasına git
             [self openInstructionDetailAtIndex:-1];
