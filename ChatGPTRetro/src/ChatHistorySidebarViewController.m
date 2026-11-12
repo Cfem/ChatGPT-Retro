@@ -108,7 +108,7 @@
     ChatSession *session = [ChatHistoryManager sharedManager].sessions[indexPath.row];
     BOOL isActive = (session == [ChatHistoryManager sharedManager].activeSession);
 
-    cell.textLabel.text = [NSString stringWithFormat:@"%@ %@", isActive ? @"💬" : @"🗨️", session.title ?: @"Sohbet"];
+    cell.textLabel.text = session.title ?: LocalizedString(@"new_chat_title");
     cell.textLabel.textColor = isActive ? [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0] : [UIColor blackColor];
 
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];

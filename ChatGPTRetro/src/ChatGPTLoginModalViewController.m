@@ -93,7 +93,7 @@
     UIButton *copyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     copyBtn.frame = CGRectMake(pad, CGRectGetMaxY(_qrImageView.frame) + 10, contentW, 30);
     copyBtn.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [copyBtn setTitle:@"🔗 Giriş Linkini Panoya Kopyala" forState:UIControlStateNormal];
+    [copyBtn setTitle:@"Giriş Linkini Panoya Kopyala" forState:UIControlStateNormal];
     copyBtn.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
     [copyBtn setTitleColor:[UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0] forState:UIControlStateNormal];
     [copyBtn addTarget:self action:@selector(copyLinkAction) forControlEvents:UIControlEventTouchUpInside];
@@ -130,7 +130,7 @@
     _pasteAndSubmitButton.frame = CGRectMake(pad, CGRectGetMaxY(_urlField.frame) + 14, contentW, 44);
     _pasteAndSubmitButton.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _pasteAndSubmitButton.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
-    [_pasteAndSubmitButton setTitle:@"📋 Panodan Yapıştır ve Girişi Tamamla" forState:UIControlStateNormal];
+    [_pasteAndSubmitButton setTitle:@"Panodan Yapıştır ve Girişi Tamamla" forState:UIControlStateNormal];
     [_pasteAndSubmitButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _pasteAndSubmitButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
     _pasteAndSubmitButton.layer.cornerRadius = 8.0;
