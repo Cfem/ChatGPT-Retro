@@ -36,6 +36,7 @@
 @property (nonatomic, assign) CGFloat keyboardHeight;
 @property (nonatomic, assign) BOOL isSending;
 @property (nonatomic, assign) BOOL isWebSearchActive;
+@property (nonatomic, assign) BOOL hasShownInitialWelcome;
 
 @end
 
@@ -401,7 +402,11 @@
     if (session.messages.count > 0) {
         [self.messages addObjectsFromArray:session.messages];
     } else {
-        [self addWelcomeMessageIfNeeded];
+        // Hoş geldiniz mesajı sadece uygulama ilk açıldığında gösterilir, yeni sohbet açınca boş başlar
+        if (!self.hasShownInitialWelcome) {
+            self.hasShownInitialWelcome = YES;
+            [self addWelcomeMessageIfNeeded];
+        }
     }
     self.title = session.title ?: @"ChatGPT";
     [self.tableView reloadData];
@@ -613,7 +618,8 @@
     if (active) {
         [active.messages removeAllObjects];
         for (ChatMessage *m in self.messages) {
-            if ([m.text containsString:@"iPad Mini 1 (iOS 8.4)"]) continue;
+            if ([m.text containsString:@"ChatGPT Retro'ya Hoş Geldiniz!"] ||
+                [m.text containsString:@"Welcome to ChatGPT Retro!"]) continue;
             [active.messages addObject:m];
         }
         [[ChatHistoryManager sharedManager] saveSessions];
