@@ -1,12 +1,13 @@
 #import "ChatSession.h"
 #import "ChatMessage.h"
+#import "LocalizationManager.h"
 
 @implementation ChatSession
 
 + (instancetype)sessionWithTitle:(NSString *)title {
     ChatSession *s = [[ChatSession alloc] init];
     s.sessionId = [[NSUUID UUID] UUIDString];
-    s.title = (title && title.length > 0) ? title : @"Yeni Sohbet";
+    s.title = (title && title.length > 0) ? title : LocalizedString(@"new_chat_title");
     s.updatedAt = [NSDate date];
     s.messages = [NSMutableArray array];
     return s;

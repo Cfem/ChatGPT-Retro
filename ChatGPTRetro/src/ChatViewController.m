@@ -6,18 +6,25 @@
 #import "ChatGPTLoginModalViewController.h"
 #import "ChatHistoryManager.h"
 #import "ChatHistorySidebarViewController.h"
+#import "LocalizationManager.h"
 
 @interface ChatViewController () <SettingsViewControllerDelegate, ChatGPTLoginModalDelegate, ChatHistorySidebarDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray *messages;
 
-// Slide-out Drawer / Sidebar Properties
+// Slide-out Drawer / Sidebar (Left: Chats History)
 @property (nonatomic, strong) ChatHistorySidebarViewController *sidebarVC;
 @property (nonatomic, strong) UINavigationController *sidebarNavController;
 @property (nonatomic, strong) UIView *sidebarContainerView;
 @property (nonatomic, strong) UIView *dimmingOverlayView;
 @property (nonatomic, assign) BOOL isSidebarOpen;
+
+// Slide-out Drawer / Settings (Right: Wide Settings Drawer)
+@property (nonatomic, strong) SettingsViewController *settingsVC;
+@property (nonatomic, strong) UINavigationController *settingsNavController;
+@property (nonatomic, strong) UIView *settingsContainerView;
+@property (nonatomic, assign) BOOL isSettingsOpen;
 
 // Giriş çubuğu bileşenleri
 @property (nonatomic, strong) UIView *inputContainerView;
@@ -64,6 +71,11 @@
                                                  name:kChatGPTAuthStateDidChangeNotification
                                                object:nil];
 
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(languageDidChange:)
+                                                 name:kLanguageDidChangeNotification
+                                               object:nil];
+
     // Aktif oturumu yükle
     ChatSession *active = [ChatHistoryManager sharedManager].activeSession;
     [self loadSession:active];
@@ -80,26 +92,36 @@
     });
 }
 
+- (void)languageDidChange:(NSNotification *)note {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self setupNavigationItems];
+        [self updateTitleWithModel];
+        self.inputTextField.placeholder = LocalizedString(@"input_placeholder");
+        [self.sendButton setTitle:LocalizedString(@"send_button") forState:UIControlStateNormal];
+        [self.tableView reloadData];
+    });
+}
+
 - (void)updateTitleWithModel {
     NSString *model = [OpenAIClient sharedClient].selectedModel;
-    NSString *authStatus = @" [Giriş Gerekli]";
+    NSString *authStatus = LocalizedString(@"auth_status_need_login");
     if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
-        authStatus = @" [Using ChatGPT Plan]";
+        authStatus = LocalizedString(@"auth_status_plan");
     } else if ([OpenAIClient sharedClient].apiKey.length > 10) {
-        authStatus = @" [API Key Hazır]";
+        authStatus = LocalizedString(@"auth_status_ready");
     }
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.4)", model ?: @"gpt-4o-mini", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.5)", model ?: @"gpt-4o-mini", authStatus];
 }
 
 - (void)setupNavigationItems {
-    // Sol: Sadece "☰ Sohbetler" Butonu (Temizle kaldırıldı)
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"☰ Sohbetler"
+    // Sol: Sadece "☰ Sohbetler" Butonu (Yerelleştirilmiş)
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"sidebar_chats")
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:self
                                                                             action:@selector(toggleSidebar)];
 
-    // Sağ: Yeni Sohbet (+) ve Ayarlar Butonları
-    UIBarButtonItem *settingsBtn = [[UIBarButtonItem alloc] initWithTitle:@"Ayarlar"
+    // Sağ: Yeni Sohbet (+) ve Ayarlar Butonları (Yerelleştirilmiş)
+    UIBarButtonItem *settingsBtn = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"settings_title")
                                                                     style:UIBarButtonItemStylePlain
                                                                    target:self
                                                                    action:@selector(openSettingsTapped)];
@@ -122,16 +144,37 @@
     return w;
 }
 
-- (void)setupSidebarGestures {
-    // Ekranın sol kenarından sağa kaydırarak açma (Screen Edge Swipe)
-    UIScreenEdgePanGestureRecognizer *edgeSwipe = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(handleScreenEdgePan:)];
-    edgeSwipe.edges = UIRectEdgeLeft;
-    [self.view addGestureRecognizer:edgeSwipe];
+- (CGFloat)settingsWidth {
+    CGFloat screenW = self.view.window.bounds.size.width;
+    if (screenW <= 0) screenW = self.view.bounds.size.width;
+    // Enlemesine geniş sağ çekmece (iPad ekranının %58'i veya minimum 440pt)
+    CGFloat w = screenW * 0.58;
+    if (w < 420.0) w = 420.0;
+    if (screenW > 0 && w > screenW * 0.9) w = screenW * 0.9;
+    return w;
 }
 
-- (void)handleScreenEdgePan:(UIScreenEdgePanGestureRecognizer *)recognizer {
-    if (recognizer.state == UIGestureRecognizerStateBegan && !self.isSidebarOpen) {
+- (void)setupSidebarGestures {
+    // Ekranın sol kenarından sağa kaydırarak açma (Screen Edge Swipe Left -> Sidebar)
+    UIScreenEdgePanGestureRecognizer *edgeSwipeLeft = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(handleScreenEdgePanLeft:)];
+    edgeSwipeLeft.edges = UIRectEdgeLeft;
+    [self.view addGestureRecognizer:edgeSwipeLeft];
+
+    // Ekranın sağ kenarından sola kaydırarak açma (Screen Edge Swipe Right -> Settings)
+    UIScreenEdgePanGestureRecognizer *edgeSwipeRight = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(handleScreenEdgePanRight:)];
+    edgeSwipeRight.edges = UIRectEdgeRight;
+    [self.view addGestureRecognizer:edgeSwipeRight];
+}
+
+- (void)handleScreenEdgePanLeft:(UIScreenEdgePanGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan && !self.isSidebarOpen && !self.isSettingsOpen) {
         [self openSidebarAnimated:YES];
+    }
+}
+
+- (void)handleScreenEdgePanRight:(UIScreenEdgePanGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan && !self.isSettingsOpen && !self.isSidebarOpen) {
+        [self openSettingsAnimated:YES];
     }
 }
 
@@ -143,15 +186,19 @@
     CGFloat sWidth = [self sidebarWidth];
 
     // 1. Arka planı karartan ve dokununca kapatan Dimming Overlay
-    _dimmingOverlayView = [[UIView alloc] initWithFrame:winBounds];
-    _dimmingOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _dimmingOverlayView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
-    _dimmingOverlayView.alpha = 0.0;
+    if (!_dimmingOverlayView) {
+        _dimmingOverlayView = [[UIView alloc] initWithFrame:winBounds];
+        _dimmingOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        _dimmingOverlayView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
+        _dimmingOverlayView.alpha = 0.0;
 
-    UITapGestureRecognizer *tapToClose = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(closeSidebar)];
-    [_dimmingOverlayView addGestureRecognizer:tapToClose];
+        UITapGestureRecognizer *tapToClose = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDimmingOverlayTap)];
+        [_dimmingOverlayView addGestureRecognizer:tapToClose];
 
-    // 2. Sidebar Sütunu (Tam Yükseklik)
+        [targetWindow addSubview:_dimmingOverlayView];
+    }
+
+    // 2. Sidebar Sütunu (Tam Yükseklik - Soldan Kayar)
     _sidebarContainerView = [[UIView alloc] initWithFrame:CGRectMake(-sWidth, 0, sWidth, winBounds.size.height)];
     _sidebarContainerView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleRightMargin;
     _sidebarContainerView.backgroundColor = [UIColor whiteColor];
@@ -176,13 +223,62 @@
     swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
     [_sidebarContainerView addGestureRecognizer:swipeLeft];
 
-    // Dimming overlay'e de sola kaydırma ekle
-    UISwipeGestureRecognizer *dimSwipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(closeSidebar)];
-    dimSwipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
-    [_dimmingOverlayView addGestureRecognizer:dimSwipeLeft];
-
-    [targetWindow addSubview:_dimmingOverlayView];
     [targetWindow addSubview:_sidebarContainerView];
+}
+
+- (void)ensureSettingsViews {
+    if (self.settingsContainerView) return;
+
+    UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+    CGRect winBounds = targetWindow.bounds;
+    CGFloat setWidth = [self settingsWidth];
+
+    // Dimming overlay
+    if (!_dimmingOverlayView) {
+        _dimmingOverlayView = [[UIView alloc] initWithFrame:winBounds];
+        _dimmingOverlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        _dimmingOverlayView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
+        _dimmingOverlayView.alpha = 0.0;
+
+        UITapGestureRecognizer *tapToClose = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDimmingOverlayTap)];
+        [_dimmingOverlayView addGestureRecognizer:tapToClose];
+
+        [targetWindow addSubview:_dimmingOverlayView];
+    }
+
+    // Settings Çekmecesi (Sağdan Enlemesine Kayar)
+    _settingsContainerView = [[UIView alloc] initWithFrame:CGRectMake(winBounds.size.width, 0, setWidth, winBounds.size.height)];
+    _settingsContainerView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleLeftMargin;
+    _settingsContainerView.backgroundColor = [UIColor whiteColor];
+
+    _settingsContainerView.layer.shadowColor = [UIColor blackColor].CGColor;
+    _settingsContainerView.layer.shadowOpacity = 0.35;
+    _settingsContainerView.layer.shadowRadius = 8.0;
+    _settingsContainerView.layer.shadowOffset = CGSizeMake(-3.0, 0);
+
+    _settingsVC = [[SettingsViewController alloc] init];
+    _settingsVC.delegate = self;
+    _settingsNavController = [[UINavigationController alloc] initWithRootViewController:_settingsVC];
+    _settingsNavController.view.frame = _settingsContainerView.bounds;
+    _settingsNavController.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+    [_settingsContainerView addSubview:_settingsNavController.view];
+
+    // Sağa kaydırınca kapatma (Swipe Right on Settings)
+    UISwipeGestureRecognizer *swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(closeSettings)];
+    swipeRight.direction = UISwipeGestureRecognizerDirectionRight;
+    [_settingsContainerView addGestureRecognizer:swipeRight];
+
+    [targetWindow addSubview:_settingsContainerView];
+}
+
+- (void)handleDimmingOverlayTap {
+    if (self.isSidebarOpen) {
+        [self closeSidebar];
+    }
+    if (self.isSettingsOpen) {
+        [self closeSettings];
+    }
 }
 
 - (void)toggleSidebar {
@@ -195,6 +291,9 @@
 
 - (void)openSidebarAnimated:(BOOL)animated {
     [self.view endEditing:YES];
+    if (self.isSettingsOpen) {
+        [self closeSettings];
+    }
     [self ensureSidebarViews];
     [self.sidebarVC reloadHistory];
 
@@ -284,12 +383,72 @@
     });
 }
 
+- (void)openSettingsAnimated:(BOOL)animated {
+    [self.view endEditing:YES];
+    if (self.isSidebarOpen) {
+        [self closeSidebar];
+    }
+    [self ensureSettingsViews];
+
+    UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+    CGRect winBounds = targetWindow.bounds;
+    CGFloat setWidth = [self settingsWidth];
+
+    self.dimmingOverlayView.frame = winBounds;
+    self.settingsContainerView.frame = CGRectMake(winBounds.size.width, 0, setWidth, winBounds.size.height);
+    self.dimmingOverlayView.hidden = NO;
+
+    void (^animations)(void) = ^{
+        self.dimmingOverlayView.alpha = 1.0;
+        self.settingsContainerView.frame = CGRectMake(winBounds.size.width - setWidth, 0, setWidth, winBounds.size.height);
+    };
+
+    void (^completion)(BOOL) = ^(BOOL finished) {
+        self.isSettingsOpen = YES;
+    };
+
+    if (animated) {
+        [UIView animateWithDuration:0.28 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:animations completion:completion];
+    } else {
+        animations();
+        completion(YES);
+    }
+}
+
+- (void)closeSettings {
+    [self closeSettingsWithCompletion:nil];
+}
+
+- (void)closeSettingsWithCompletion:(void (^)(void))onComplete {
+    if (!self.isSettingsOpen && self.settingsContainerView.frame.origin.x >= self.view.window.bounds.size.width) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    UIWindow *targetWindow = self.view.window ?: [UIApplication sharedApplication].keyWindow;
+    CGRect winBounds = targetWindow.bounds;
+    CGFloat setWidth = [self settingsWidth];
+
+    [UIView animateWithDuration:0.24 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+        if (!self.isSidebarOpen) {
+            self.dimmingOverlayView.alpha = 0.0;
+        }
+        self.settingsContainerView.frame = CGRectMake(winBounds.size.width, 0, setWidth, winBounds.size.height);
+    } completion:^(BOOL finished) {
+        self.isSettingsOpen = NO;
+        if (!self.isSidebarOpen) {
+            self.dimmingOverlayView.hidden = YES;
+        }
+        if (onComplete) onComplete();
+    }];
+}
+
 - (void)openSettingsTapped {
-    SettingsViewController *settingsVC = [[SettingsViewController alloc] init];
-    settingsVC.delegate = self;
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:settingsVC];
-    nav.modalPresentationStyle = UIModalPresentationFormSheet;
-    [self presentViewController:nav animated:YES completion:nil];
+    if (self.isSettingsOpen) {
+        [self closeSettings];
+    } else {
+        [self openSettingsAnimated:YES];
+    }
 }
 
 - (void)settingsDidUpdate {
@@ -414,9 +573,7 @@
 }
 
 - (void)addWelcomeMessageIfNeeded {
-    NSString *welcome = @"👋 ChatGPT Retro'ya Hoş Geldiniz!\n\n"
-                        @"Bu uygulama iPad Mini 1 (iOS 8.4) üzerinde resmi OpenAI modelleriyle (GPT-4o, GPT-6 Luna vb.) doğrudan sohbet etmeniz için uyarlandı.\n\n"
-                        @"💬 Sol üstteki '☰ Sohbetler' butonundan geçmiş son 10 konuşmanıza ulaşabilir veya '+' ile yeni bir sohbet başlatabilirsiniz.";
+    NSString *welcome = LocalizedString(@"welcome_msg");
     [self.messages addObject:[ChatMessage messageWithText:welcome sender:ChatMessageSenderAssistant]];
     [self.tableView reloadData];
 }
@@ -564,20 +721,20 @@
 }
 
 - (void)showAuthPrompt {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ChatGPT Girişi Gerekli"
-                                                                   message:@"ChatGPT ile konuşabilmek için ChatGPT Plus/Pro hesabınızla QR / Telefon üzerinden giriş yapabilir veya Ayarlar'dan OpenAI API Anahtarı girebilirsiniz."
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"auth_prompt_title")
+                                                                   message:LocalizedString(@"auth_prompt_msg")
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"ChatGPT ile Giriş Yap (QR / Telefon)" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"auth_prompt_login") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         ChatGPTLoginModalViewController *modal = [[ChatGPTLoginModalViewController alloc] init];
         modal.delegate = self;
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:modal];
         nav.modalPresentationStyle = UIModalPresentationFormSheet;
         [self presentViewController:nav animated:YES completion:nil];
     }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'ı Aç" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"auth_prompt_settings") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [self openSettingsTapped];
     }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 

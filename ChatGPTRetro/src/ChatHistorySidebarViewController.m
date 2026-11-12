@@ -1,5 +1,6 @@
 #import "ChatHistorySidebarViewController.h"
 #import "ChatHistoryManager.h"
+#import "LocalizationManager.h"
 
 @interface ChatHistorySidebarViewController () <UITableViewDataSource, UITableViewDelegate>
 
@@ -12,7 +13,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Geçmiş Sohbetler";
+    self.title = LocalizedString(@"history_title");
     self.view.backgroundColor = [UIColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
 
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCompose
@@ -21,6 +22,23 @@
 
     [self setupNewChatButton];
     [self setupTableView];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(languageDidChange:)
+                                                 name:kLanguageDidChangeNotification
+                                               object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)languageDidChange:(NSNotification *)note {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.title = LocalizedString(@"history_title");
+        [self.createNewChatButton setTitle:LocalizedString(@"new_chat_button") forState:UIControlStateNormal];
+        [self.tableView reloadData];
+    });
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -38,7 +56,7 @@
     _createNewChatButton.frame = CGRectMake(12, 10, w - 24, 42);
     _createNewChatButton.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _createNewChatButton.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
-    [_createNewChatButton setTitle:@"＋ Yeni Sohbet Başlat" forState:UIControlStateNormal];
+    [_createNewChatButton setTitle:LocalizedString(@"new_chat_button") forState:UIControlStateNormal];
     [_createNewChatButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _createNewChatButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
     _createNewChatButton.layer.cornerRadius = 8.0;
@@ -96,7 +114,7 @@
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.dateFormat = @"dd MMM HH:mm";
     NSString *dateStr = [fmt stringFromDate:session.updatedAt];
-    cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu mesaj • %@", (unsigned long)session.messages.count, dateStr ?: @""];
+    cell.detailTextLabel.text = [NSString stringWithFormat:LocalizedString(@"msg_count_format"), (unsigned long)session.messages.count, dateStr ?: @""];
 
     cell.accessoryType = isActive ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryDisclosureIndicator;
     return cell;
