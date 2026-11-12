@@ -1,5 +1,6 @@
 #import "ChatGPTLoginModalViewController.h"
 #import "OpenAIClient.h"
+#import "LocalizationManager.h"
 #import <CoreImage/CoreImage.h>
 
 @interface ChatGPTLoginModalViewController () <UITextFieldDelegate>
@@ -19,10 +20,10 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"ChatGPT ile Giriş Yap";
+    self.title = LocalizedString(@"auth_prompt_login");
     self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
 
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Kapat"
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:LocalizedString(@"close_button")
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:self
                                                                             action:@selector(closeAction)];
@@ -72,7 +73,7 @@
     UILabel *descLabel = [[UILabel alloc] initWithFrame:CGRectMake(pad, 15, contentW, 48)];
     descLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     descLabel.numberOfLines = 0;
-    descLabel.text = @"1. iPhone veya modern telefonunuzla aşağıdaki QR kodu okutun ve ChatGPT Plus/Pro hesabınızla giriş yapın:";
+    descLabel.text = LocalizedString(@"qr_step1_desc");
     descLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:14.0];
     descLabel.textColor = [UIColor darkGrayColor];
     [_scrollView addSubview:descLabel];
@@ -93,7 +94,7 @@
     UIButton *copyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     copyBtn.frame = CGRectMake(pad, CGRectGetMaxY(_qrImageView.frame) + 10, contentW, 30);
     copyBtn.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [copyBtn setTitle:@"Giriş Linkini Panoya Kopyala" forState:UIControlStateNormal];
+    [copyBtn setTitle:LocalizedString(@"qr_copy_link") forState:UIControlStateNormal];
     copyBtn.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
     [copyBtn setTitleColor:[UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0] forState:UIControlStateNormal];
     [copyBtn addTarget:self action:@selector(copyLinkAction) forControlEvents:UIControlEventTouchUpInside];
@@ -103,7 +104,7 @@
     UILabel *step2Label = [[UILabel alloc] initWithFrame:CGRectMake(pad, CGRectGetMaxY(copyBtn.frame) + 14, contentW, 60)];
     step2Label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     step2Label.numberOfLines = 0;
-    step2Label.text = @"2. Telefonda onaylayınca tarayıcının adres çubuğunda kalan yönlendirme linkini kopyalayıp (AirDrop veya Pano ile) buraya yapıştırın:";
+    step2Label.text = LocalizedString(@"qr_step2_desc");
     step2Label.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:14.0];
     step2Label.textColor = [UIColor darkGrayColor];
     [_scrollView addSubview:step2Label];
@@ -112,7 +113,7 @@
     _urlField = [[UITextField alloc] initWithFrame:CGRectMake(pad, CGRectGetMaxY(step2Label.frame) + 8, contentW, 40)];
     _urlField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _urlField.backgroundColor = [UIColor whiteColor];
-    _urlField.placeholder = @"http://127.0.0.1:8787/auth/callback?code=... veya sadece kod";
+    _urlField.placeholder = @"http://127.0.0.1:8787/auth/callback?code=...";
     _urlField.font = [UIFont fontWithName:@"HelveticaNeue" size:13.0];
     _urlField.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
     _urlField.layer.borderWidth = 1.0;
@@ -130,7 +131,7 @@
     _pasteAndSubmitButton.frame = CGRectMake(pad, CGRectGetMaxY(_urlField.frame) + 14, contentW, 44);
     _pasteAndSubmitButton.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _pasteAndSubmitButton.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
-    [_pasteAndSubmitButton setTitle:@"Panodan Yapıştır ve Girişi Tamamla" forState:UIControlStateNormal];
+    [_pasteAndSubmitButton setTitle:LocalizedString(@"qr_paste_btn") forState:UIControlStateNormal];
     [_pasteAndSubmitButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _pasteAndSubmitButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
     _pasteAndSubmitButton.layer.cornerRadius = 8.0;
@@ -141,7 +142,7 @@
     _openSafariDirectButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _openSafariDirectButton.frame = CGRectMake(pad, CGRectGetMaxY(_pasteAndSubmitButton.frame) + 12, contentW, 36);
     _openSafariDirectButton.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [_openSafariDirectButton setTitle:@"iPad Safari'sinde Açmayı Dene (Doğrudan)" forState:UIControlStateNormal];
+    [_openSafariDirectButton setTitle:LocalizedString(@"qr_safari_btn") forState:UIControlStateNormal];
     [_openSafariDirectButton setTitleColor:[UIColor colorWithWhite:0.35 alpha:1.0] forState:UIControlStateNormal];
     _openSafariDirectButton.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:13.0];
     [_openSafariDirectButton addTarget:self action:@selector(openSafariDirectAction) forControlEvents:UIControlEventTouchUpInside];

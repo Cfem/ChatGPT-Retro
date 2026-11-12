@@ -1,18 +1,17 @@
 #import "SettingsViewController.h"
 #import "OpenAIClient.h"
-#import "ChatGPTLoginModalViewController.h"
 #import "LocalizationManager.h"
+#import "ModelSelectionViewController.h"
+#import "AccountLoginViewController.h"
 #import "AdvancedSettingsViewController.h"
+#import "SystemPromptDetailViewController.h"
 
-@interface SettingsViewController () <ChatGPTLoginModalDelegate, UIPickerViewDataSource, UIPickerViewDelegate, UITextViewDelegate>
+@interface SettingsViewController () <ModelSelectionDelegate, AccountLoginDelegate, SystemPromptDetailDelegate, UIPickerViewDataSource, UIPickerViewDelegate>
 
-@property (nonatomic, strong) UITextField *apiKeyField;
-@property (nonatomic, strong) UITextField *modelField;
-@property (nonatomic, strong) UITextView *systemInstructionTextView;
 @property (nonatomic, strong) UITextField *languagePickerField;
 @property (nonatomic, strong) UIPickerView *languagePicker;
 
-// Dynamic Model Capability Controls (Section 3)
+// Dynamic Model Capability Controls (Section 1)
 @property (nonatomic, strong) UISlider *reasoningEffortSlider;
 @property (nonatomic, strong) UILabel *reasoningEffortValueLabel;
 @property (nonatomic, strong) UISwitch *reasoningSummarySwitch;
@@ -20,16 +19,6 @@
 @property (nonatomic, strong) UILabel *temperatureValueLabel;
 @property (nonatomic, strong) UISwitch *webSearchSwitch;
 @property (nonatomic, strong) UISwitch *codeInterpreterSwitch;
-
-// Advanced Optimizations Controls (Section 6)
-@property (nonatomic, strong) UISwitch *promptCachingSwitch;
-@property (nonatomic, strong) UISwitch *truncateAssistantSwitch;
-@property (nonatomic, strong) UISlider *tokenTurnsSlider;
-@property (nonatomic, strong) UILabel *tokenTurnsValueLabel;
-@property (nonatomic, strong) UISwitch *keywordFilteringSwitch;
-
-@property (nonatomic, assign) BOOL isFetchingModels;
-@property (nonatomic, assign) BOOL isSigningIn;
 
 @end
 
@@ -44,14 +33,9 @@
     [super viewDidLoad];
     self.title = LocalizedString(@"settings_title");
 
-    // "Kapat" ve "Kaydet" butonları kaldırıldı (Dışarıya/karanlık alana dokunulduğunda otomatik kaydedilip kapanır)
+    // Apple minimalist estetik: Sol ve sağ bar butonları kaldırıldı (karanlık alana basınca sessizce kaydeder ve kapatır)
     self.navigationItem.leftBarButtonItem = nil;
     self.navigationItem.rightBarButtonItem = nil;
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(authStateDidChange:)
-                                                 name:kChatGPTAuthStateDidChangeNotification
-                                               object:nil];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(languageDidChange:)
@@ -59,6 +43,10 @@
                                                object:nil];
 
     [self setupFields];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -70,8 +58,6 @@
 - (void)languageDidChange:(NSNotification *)note {
     dispatch_async(dispatch_get_main_queue(), ^{
         self.title = LocalizedString(@"settings_title");
-        self.navigationItem.leftBarButtonItem.title = LocalizedString(@"close_button");
-        self.navigationItem.rightBarButtonItem.title = LocalizedString(@"save_button");
         [self updateLanguageFieldText];
         [self updateReasoningEffortLabelText];
         [self.languagePicker reloadAllComponents];
@@ -85,20 +71,10 @@
     });
 }
 
-- (void)authStateDidChange:(NSNotification *)note {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.isSigningIn = NO;
-        [self.tableView reloadData];
-        if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-            [self.delegate settingsDidUpdate];
-        }
-    });
-}
-
 - (void)setupFields {
     UIColor *openAIGreen = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
 
-    // 1. Language Picker Field & Accessory Toolbar (iOS classic bottom wheel, hidden trigger)
+    // Language Picker Field & Accessory Toolbar (Gizli tetikleyici, tekerlek açılır)
     _languagePicker = [[UIPickerView alloc] init];
     _languagePicker.dataSource = self;
     _languagePicker.delegate = self;
@@ -121,37 +97,7 @@
     [self selectCurrentLanguageInPickerAnimated:NO];
     [self updateLanguageFieldText];
 
-    // 2. API Key
-    _apiKeyField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _apiKeyField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    _apiKeyField.placeholder = @"sk-... (API Key)";
-    _apiKeyField.text = [OpenAIClient sharedClient].apiKey;
-    _apiKeyField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-    _apiKeyField.secureTextEntry = YES;
-    _apiKeyField.autocapitalizationType = UITextAutocapitalizationTypeNone;
-    _apiKeyField.autocorrectionType = UITextAutocorrectionTypeNo;
-    _apiKeyField.clearButtonMode = UITextFieldViewModeWhileEditing;
-
-    // 3. Model (Dinamik güncelleme için UIControlEventEditingChanged bağlı)
-    _modelField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _modelField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    _modelField.placeholder = @"gpt-4o-mini";
-    _modelField.text = [OpenAIClient sharedClient].selectedModel;
-    _modelField.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-    _modelField.autocapitalizationType = UITextAutocapitalizationTypeNone;
-    _modelField.autocorrectionType = UITextAutocorrectionTypeNo;
-    _modelField.clearButtonMode = UITextFieldViewModeWhileEditing;
-    _modelField.delegate = self;
-    [_modelField addTarget:self action:@selector(modelFieldEditingChanged:) forControlEvents:UIControlEventEditingChanged];
-
-    // 4. Custom System Instructions
-    _systemInstructionTextView = [[UITextView alloc] initWithFrame:CGRectZero];
-    _systemInstructionTextView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _systemInstructionTextView.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-    _systemInstructionTextView.backgroundColor = [UIColor clearColor];
-    _systemInstructionTextView.text = [OpenAIClient sharedClient].customSystemInstruction;
-
-    // 5. Dynamic Model Capability Controls (Sliders & Switches)
+    // Dynamic Model Capability Controls (Section 1)
     _reasoningEffortSlider = [[UISlider alloc] initWithFrame:CGRectZero];
     _reasoningEffortSlider.minimumValue = 0.0f;
     _reasoningEffortSlider.maximumValue = 6.0f;
@@ -194,46 +140,11 @@
     _codeInterpreterSwitch.onTintColor = openAIGreen;
     _codeInterpreterSwitch.on = [OpenAIClient sharedClient].enableCodeInterpreter;
     [_codeInterpreterSwitch addTarget:self action:@selector(codeInterpreterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-
-    // 6. Advanced Cost Optimization Controls
-    _promptCachingSwitch = [[UISwitch alloc] init];
-    _promptCachingSwitch.onTintColor = openAIGreen;
-    _promptCachingSwitch.on = [OpenAIClient sharedClient].enablePromptCaching;
-    [_promptCachingSwitch addTarget:self action:@selector(promptCachingSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-
-    _truncateAssistantSwitch = [[UISwitch alloc] init];
-    _truncateAssistantSwitch.onTintColor = openAIGreen;
-    _truncateAssistantSwitch.on = [OpenAIClient sharedClient].enableTruncateAssistant;
-    [_truncateAssistantSwitch addTarget:self action:@selector(truncateAssistantSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-
-    _keywordFilteringSwitch = [[UISwitch alloc] init];
-    _keywordFilteringSwitch.onTintColor = openAIGreen;
-    _keywordFilteringSwitch.on = [OpenAIClient sharedClient].enableKeywordFiltering;
-    [_keywordFilteringSwitch addTarget:self action:@selector(keywordFilteringSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-
-    // Eğer anahtar kelime açıksa asistan kırpma devre dışı olsun, ya da tam tersi
-    [self updateAdvancedTogglesMutualExclusion];
-
-    _tokenTurnsSlider = [[UISlider alloc] initWithFrame:CGRectZero];
-    _tokenTurnsSlider.minimumValue = 1.0f;
-    _tokenTurnsSlider.maximumValue = 20.0f;
-    _tokenTurnsSlider.continuous = YES;
-    _tokenTurnsSlider.minimumTrackTintColor = openAIGreen;
-    _tokenTurnsSlider.value = (float)[OpenAIClient sharedClient].maxHistoryTurns;
-    [_tokenTurnsSlider addTarget:self action:@selector(tokenTurnsSliderChanged:) forControlEvents:UIControlEventValueChanged];
-
-    _tokenTurnsValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
-    _tokenTurnsValueLabel.textAlignment = NSTextAlignmentRight;
-    _tokenTurnsValueLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:13.0];
-    _tokenTurnsValueLabel.textColor = openAIGreen;
-    [self updateTokenTurnsLabelText];
 }
 
-#pragma mark - Dynamic Capability Actions
+#pragma mark - Capability Helpers
 
 - (NSString *)activeModelString {
-    NSString *m = [self.modelField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (m.length > 0) return m;
     return [OpenAIClient sharedClient].selectedModel ?: @"gpt-4o-mini";
 }
 
@@ -256,17 +167,6 @@
         [rows addObject:@"code_interpreter"];
     }
     return rows;
-}
-
-- (void)modelFieldEditingChanged:(UITextField *)sender {
-    [[OpenAIClient sharedClient] saveSelectedModel:sender.text];
-    // Sadece 3. seksiyonu (Model Ek Özellikleri) dinamik yenile, klavyeyi kapatma
-    [UIView performWithoutAnimation:^{
-        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3] withRowAnimation:UITableViewRowAnimationNone];
-    }];
-    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-        [self.delegate settingsDidUpdate];
-    }
 }
 
 - (void)updateReasoningEffortLabelText {
@@ -305,49 +205,37 @@
     [OpenAIClient sharedClient].enableCodeInterpreter = sender.isOn;
 }
 
-#pragma mark - Advanced Optimizations Handlers
+#pragma mark - Delegates & Silent Save
 
-- (void)updateAdvancedTogglesMutualExclusion {
-    if (self.keywordFilteringSwitch.isOn) {
-        self.truncateAssistantSwitch.on = NO;
-        self.truncateAssistantSwitch.enabled = NO;
-        self.keywordFilteringSwitch.enabled = YES;
-    } else if (self.truncateAssistantSwitch.isOn) {
-        self.keywordFilteringSwitch.on = NO;
-        self.keywordFilteringSwitch.enabled = NO;
-        self.truncateAssistantSwitch.enabled = YES;
-    } else {
-        self.truncateAssistantSwitch.enabled = YES;
-        self.keywordFilteringSwitch.enabled = YES;
+- (void)saveCurrentSettingsSilently {
+    [self.view endEditing:YES];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
     }
 }
 
-- (void)promptCachingSwitchChanged:(UISwitch *)sender {
-    [OpenAIClient sharedClient].enablePromptCaching = sender.isOn;
+- (void)modelSelectionDidSelectModel:(NSString *)model {
+    [self.tableView reloadData];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
 }
 
-- (void)truncateAssistantSwitchChanged:(UISwitch *)sender {
-    [OpenAIClient sharedClient].enableTruncateAssistant = sender.isOn;
-    [self updateAdvancedTogglesMutualExclusion];
+- (void)accountLoginStateDidChange {
+    [self.tableView reloadData];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
 }
 
-- (void)keywordFilteringSwitchChanged:(UISwitch *)sender {
-    [OpenAIClient sharedClient].enableKeywordFiltering = sender.isOn;
-    [self updateAdvancedTogglesMutualExclusion];
+- (void)systemPromptDidSaveOrDelete {
+    [self.tableView reloadData];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
 }
 
-- (void)updateTokenTurnsLabelText {
-    NSInteger turns = (NSInteger)roundf(self.tokenTurnsSlider.value);
-    NSString *format = LocalizedString(@"turns_count_format");
-    self.tokenTurnsValueLabel.text = [NSString stringWithFormat:format, (long)turns];
-}
-
-- (void)tokenTurnsSliderChanged:(UISlider *)sender {
-    NSInteger snapped = (NSInteger)roundf(sender.value);
-    [sender setValue:(float)snapped animated:NO];
-    [OpenAIClient sharedClient].maxHistoryTurns = snapped;
-    [self updateTokenTurnsLabelText];
-}
+#pragma mark - Language Picker
 
 - (void)updateLanguageFieldText {
     _languagePickerField.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
@@ -367,8 +255,6 @@
 - (void)languagePickerDone {
     [self.languagePickerField resignFirstResponder];
 }
-
-#pragma mark - UIPickerView DataSource & Delegate
 
 - (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
     return 1;
@@ -395,319 +281,60 @@
     }
 }
 
-- (void)closeButtonTapped {
-    [self.view endEditing:YES];
-    if ([self.delegate respondsToSelector:@selector(settingsDidRequestClose)]) {
-        [self.delegate settingsDidRequestClose];
-    } else {
-        [self dismissViewControllerAnimated:YES completion:nil];
-    }
-}
-
-#pragma mark - System Prompts Actions (Apple Style List & Checkmark)
-
-- (void)addNewPromptAction {
-    [self.view endEditing:YES];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"add_prompt_title")
-                                                                   message:nil
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = LocalizedString(@"prompt_content_placeholder");
-        textField.autocapitalizationType = UITextAutocapitalizationTypeSentences;
-    }];
-
-    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSString *content = alert.textFields[0].text;
-        if (content.length > 0) {
-            NSMutableDictionary *newPrompt = [@{
-                @"id": [[NSUUID UUID] UUIDString],
-                @"content": content,
-                @"enabled": @YES
-            } mutableCopy];
-
-            NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
-            [list addObject:newPrompt];
-            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationAutomatic];
-        }
-    }]];
-
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)editPromptAtIndex:(NSInteger)index {
-    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
-    if (index < 0 || index >= (NSInteger)list.count) return;
-
-    NSMutableDictionary *item = list[index];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"edit_prompt_title")
-                                                                   message:nil
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.text = item[@"content"] ?: @"";
-        textField.placeholder = LocalizedString(@"prompt_content_placeholder");
-    }];
-
-    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSString *content = alert.textFields[0].text;
-        if (content.length > 0) {
-            item[@"content"] = content;
-            [[OpenAIClient sharedClient] saveSystemPromptsList:list];
-            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:4] withRowAnimation:UITableViewRowAnimationNone];
-        }
-    }]];
-
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-#pragma mark - Actions
-
-- (void)saveCurrentSettingsSilently {
-    [self.view endEditing:YES];
-
-    NSString *key = self.apiKeyField.text ?: @"";
-    NSString *model = self.modelField.text ?: @"gpt-4o-mini";
-
-    [[OpenAIClient sharedClient] saveApiKey:key];
-    [[OpenAIClient sharedClient] saveSelectedModel:model];
-
-    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-        [self.delegate settingsDidUpdate];
-    }
-}
-
-- (void)saveSettingsAction {
-    [self saveCurrentSettingsSilently];
-
-    NSString *model = self.modelField.text ?: @"gpt-4o-mini";
-    NSString *msg = [NSString stringWithFormat:@"%@\n\n• Model: %@", LocalizedString(@"saved_alert_msg"), model];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:LocalizedString(@"saved_alert_title") message:msg preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        if ([self.delegate respondsToSelector:@selector(settingsDidRequestClose)]) {
-            [self.delegate settingsDidRequestClose];
-        } else {
-            [self dismissViewControllerAnimated:YES completion:nil];
-        }
-    }]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)signInWithChatGPTAction {
-    [self.view endEditing:YES];
-    ChatGPTLoginModalViewController *modal = [[ChatGPTLoginModalViewController alloc] init];
-    modal.delegate = self;
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:modal];
-    nav.modalPresentationStyle = UIModalPresentationFormSheet;
-    [self presentViewController:nav animated:YES completion:nil];
-}
-
-- (void)chatGPTLoginDidComplete {
-    [self.tableView reloadData];
-    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-        [self.delegate settingsDidUpdate];
-    }
-    NSString *email = [OpenAIClient sharedClient].userEmail ?: @"ChatGPT";
-    [self showAlertWithTitle:LocalizedString(@"saved_alert_title")
-                     message:[NSString stringWithFormat:@"%@: %@", LocalizedString(@"siwc_enabled"), email]];
-}
-
-- (void)pasteManualCallbackAction {
-    [self.view endEditing:YES];
-    UIAlertController *prompt = [UIAlertController alertControllerWithTitle:LocalizedString(@"siwc_manual_btn")
-                                                                    message:@"http://127.0.0.1:8787/auth/callback?code=..."
-                                                              preferredStyle:UIAlertControllerStyleAlert];
-    [prompt addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"http://127.0.0.1:8787/auth/callback?code=...";
-        textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
-        textField.autocorrectionType = UITextAutocorrectionTypeNo;
-    }];
-    [prompt addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
-    [prompt addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        NSString *text = prompt.textFields.firstObject.text ?: @"";
-        if (text.length > 0) {
-            [[OpenAIClient sharedClient] handleIncomingCallbackURLString:text completion:^(BOOL success, NSError *error) {
-                [self.tableView reloadData];
-                if (success) {
-                    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                        [self.delegate settingsDidUpdate];
-                    }
-                    [self showAlertWithTitle:LocalizedString(@"saved_alert_title") message:LocalizedString(@"siwc_enabled")];
-                } else {
-                    [self showAlertWithTitle:@"Hata" message:error.localizedDescription];
-                }
-            }];
-        }
-    }]];
-    [self presentViewController:prompt animated:YES completion:nil];
-}
-
-- (void)manageUsageAction {
-    NSURL *usageUrl = [NSURL URLWithString:@"https://chatgpt.com/settings/usage"];
-    if (usageUrl) {
-        [[UIApplication sharedApplication] openURL:usageUrl];
-    }
-}
-
-- (void)disconnectAccountAction {
-    UIAlertController *confirm = [UIAlertController alertControllerWithTitle:LocalizedString(@"siwc_disconnect")
-                                                                     message:LocalizedString(@"siwc_disconnect")
-                                                              preferredStyle:UIAlertControllerStyleActionSheet];
-    [confirm addAction:[UIAlertAction actionWithTitle:LocalizedString(@"siwc_disconnect") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        [[OpenAIClient sharedClient] disconnectChatGPTAccountWithCompletion:^{
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self.tableView reloadData];
-                if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                    [self.delegate settingsDidUpdate];
-                }
-            });
-        }];
-    }]];
-    [confirm addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
-    confirm.popoverPresentationController.sourceView = self.view;
-    confirm.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width/2, self.view.bounds.size.height/2, 1, 1);
-    [self presentViewController:confirm animated:YES completion:nil];
-}
-
-- (void)refreshModelsAction {
-    [self.view endEditing:YES];
-    if (![[OpenAIClient sharedClient] isAuthenticated]) {
-        [self showAlertWithTitle:LocalizedString(@"auth_prompt_title")
-                         message:LocalizedString(@"auth_prompt_msg")];
-        return;
-    }
-
-    self.isFetchingModels = YES;
-    [self.tableView reloadData];
-
-    [[OpenAIClient sharedClient] fetchAvailableModelsWithCompletion:^(NSArray *models, NSError *error) {
-        self.isFetchingModels = NO;
-        if (error) {
-            [self showAlertWithTitle:@"Hata" message:error.localizedDescription];
-            [self.tableView reloadData];
-            return;
-        }
-
-        if (models.count == 0) {
-            [self showAlertWithTitle:@"Hata" message:@"Model bulunamadı."];
-            [self.tableView reloadData];
-            return;
-        }
-
-        UIAlertController *picker = [UIAlertController alertControllerWithTitle:LocalizedString(@"section_model")
-                                                                        message:nil
-                                                                 preferredStyle:UIAlertControllerStyleActionSheet];
-
-        for (NSString *m in models) {
-            [picker addAction:[UIAlertAction actionWithTitle:m style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-                self.modelField.text = m;
-                [[OpenAIClient sharedClient] saveSelectedModel:m];
-                [self.tableView reloadData];
-                if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                    [self.delegate settingsDidUpdate];
-                }
-            }]];
-        }
-
-        [picker addAction:[UIAlertAction actionWithTitle:LocalizedString(@"cancel_button") style:UIAlertActionStyleCancel handler:nil]];
-        picker.popoverPresentationController.sourceView = self.view;
-        picker.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width/2, 200, 1, 1);
-        [self presentViewController:picker animated:YES completion:nil];
-        [self.tableView reloadData];
-    }];
-}
-
-- (void)showAlertWithTitle:(NSString *)title message:(NSString *)msg {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:LocalizedString(@"ok_button") style:UIAlertActionStyleDefault handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 8;
+    return 6;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 1; // Language selection
-    if (section == 1) {
-        if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
-            return 4; // Connected, Status, Manage, Disconnect
-        }
-        return 2; // Continue with ChatGPT, Paste URL
-    }
-    if (section == 2) return 2; // Model & Refresh Models
-    if (section == 3) return [self capabilityRowTypesForCurrentModel].count; // Dynamic Model Capabilities
-    if (section == 4) {
-        // Sistem Talimatları Listesi + 1 satır ("+ Yeni Talimat Ekle")
+    if (section == 0) return 1; // Model seçimi (Sağa giden sayfa)
+    if (section == 1) return [self capabilityRowTypesForCurrentModel].count; // Model Özellikleri (Reasoning / Temp / Araçlar)
+    if (section == 2) {
+        // Özel Sistem Talimatları Listesi + "+ Yeni Talimat Ekle"
         return [OpenAIClient sharedClient].systemPromptsList.count + 1;
     }
-    if (section == 5) return 1; // API Key
-    if (section == 6) return 1; // İleri Seviye Ayarlar alt sayfası butonu
-    return 2; // System Info
+    if (section == 3) return 1; // Giriş ve Hesap Ayarları (Sağa giden sayfa)
+    if (section == 4) return 1; // İleri Seviye Maliyet ve Hafıza Ayarları (Sağa giden sayfa)
+    if (section == 5) return 1; // Dil Seçeneği
+    return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return LocalizedString(@"section_language");
-    if (section == 1) return LocalizedString(@"section_siwc");
-    if (section == 2) return LocalizedString(@"section_model");
-    if (section == 3) return LocalizedString(@"section_capabilities");
-    if (section == 4) return LocalizedString(@"section_instructions");
-    if (section == 5) return LocalizedString(@"section_apikey");
-    if (section == 6) return LocalizedString(@"section_advanced");
-    return LocalizedString(@"section_system");
+    // Kullanıcı isteği: "Bütün Ayarlardaki 'DİL SEÇENEĞİ' 'CHATGPT ile GİRİŞ YAP' gibi her satırdaki başlıkları da sil"
+    return nil;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 4) return LocalizedString(@"instructions_footer");
-    if (section == 6) return LocalizedString(@"advanced_footer");
+    if (section == 2) {
+        return LocalizedString(@"instructions_footer");
+    }
     return nil;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 3) {
+    if (indexPath.section == 1) {
         NSArray *rows = [self capabilityRowTypesForCurrentModel];
         if (indexPath.row < rows.count) {
             NSString *type = rows[indexPath.row];
             if ([type isEqualToString:@"reasoning_effort"] || [type isEqualToString:@"temperature"]) {
-                return 74.0; // Slider + etiket satırı
+                return 74.0;
             }
         }
-        return 44.0;
-    }
-    if (indexPath.section == 4) {
-        NSInteger promptCount = [OpenAIClient sharedClient].systemPromptsList.count;
-        if (indexPath.row < promptCount) {
-            NSDictionary *item = [OpenAIClient sharedClient].systemPromptsList[indexPath.row];
-            NSString *content = item[@"content"] ?: @"";
-            // iPad ekran genişliğine göre yazının tam yüksekliğini dinamik hesapla
-            CGFloat cellW = tableView.bounds.size.width > 0 ? tableView.bounds.size.width : 500.0;
-            CGFloat textW = cellW - 60.0; // Kenar boşlukları ve tik alanı
-            CGRect rect = [content boundingRectWithSize:CGSizeMake(textW, CGFLOAT_MAX)
-                                                options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading
-                                             attributes:@{NSFontAttributeName: [UIFont fontWithName:@"HelveticaNeue" size:15.0]}
-                                                context:nil];
-            CGFloat calculatedH = ceilf(rect.size.height) + 24.0;
-            return MAX(calculatedH, 44.0);
-        }
-        return 44.0; // "+ Yeni Talimat Ekle" satırı
     }
     return 44.0;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     NSString *extraKey = @"";
-    if (indexPath.section == 3) {
+    if (indexPath.section == 1) {
         NSArray *rows = [self capabilityRowTypesForCurrentModel];
         if (indexPath.row < rows.count) extraKey = rows[indexPath.row];
     }
-    NSString *cellId = [NSString stringWithFormat:@"Cell_%ld_%ld_%@_%d", (long)indexPath.section, (long)indexPath.row, extraKey, [[OpenAIClient sharedClient] isChatGPTAccountLinked]];
+    NSString *cellId = [NSString stringWithFormat:@"SettingCell_%ld_%ld_%@", (long)indexPath.section, (long)indexPath.row, extraKey];
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
+        // Sistem Talimatı satırları için Value1 (Solda kalın başlık, sağda gri özet metin)
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
     }
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -718,12 +345,11 @@
     cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:16.0];
     cell.detailTextLabel.text = nil;
     cell.detailTextLabel.textColor = [UIColor grayColor];
+    cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
 
     for (UIView *sub in cell.contentView.subviews) {
         if (sub == self.reasoningEffortSlider || sub == self.reasoningEffortValueLabel ||
-            sub == self.temperatureSlider || sub == self.temperatureValueLabel ||
-            sub == self.modelField || sub == self.apiKeyField || sub == self.systemInstructionTextView ||
-            sub == self.tokenTurnsSlider || sub == self.tokenTurnsValueLabel) {
+            sub == self.temperatureSlider || sub == self.temperatureValueLabel) {
             [sub removeFromSuperview];
         }
     }
@@ -732,69 +358,13 @@
     UIColor *openAIGreen = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
 
     if (indexPath.section == 0) {
-        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-        cell.textLabel.text = LocalizedString(@"language_label");
-        cell.detailTextLabel.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
+        // SECTION 0: MODEL SEÇİMİ (Apple Navigation Row)
+        cell.textLabel.text = LocalizedString(@"model_label");
+        cell.detailTextLabel.text = [self activeModelString];
         cell.detailTextLabel.textColor = openAIGreen;
-        cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 1) {
-        if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
-            if (indexPath.row == 0) {
-                cell.selectionStyle = UITableViewCellSelectionStyleNone;
-                NSString *email = [OpenAIClient sharedClient].userEmail;
-                cell.textLabel.text = (email && email.length > 0) ? email : @"Hesap";
-                cell.detailTextLabel.text = LocalizedString(@"siwc_connected");
-                cell.detailTextLabel.textColor = openAIGreen;
-            } else if (indexPath.row == 1) {
-                cell.selectionStyle = UITableViewCellSelectionStyleNone;
-                cell.textLabel.text = LocalizedString(@"siwc_status");
-                cell.detailTextLabel.text = [OpenAIClient sharedClient].isPlanSharingEnabled
-                    ? LocalizedString(@"siwc_enabled")
-                    : LocalizedString(@"siwc_identity_only");
-            } else if (indexPath.row == 2) {
-                cell.textLabel.text = LocalizedString(@"siwc_manage");
-                cell.textLabel.textColor = openAIGreen;
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            } else {
-                cell.textLabel.text = LocalizedString(@"siwc_disconnect");
-                cell.textLabel.textColor = [UIColor redColor];
-            }
-        } else {
-            if (indexPath.row == 0) {
-                cell.textLabel.text = LocalizedString(@"siwc_login_btn");
-                cell.textLabel.textColor = openAIGreen;
-                cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:16.0];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            } else {
-                cell.textLabel.text = LocalizedString(@"siwc_manual_btn");
-                cell.textLabel.textColor = [UIColor darkGrayColor];
-                cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
-            }
-        }
-    } else if (indexPath.section == 2) {
-        if (indexPath.row == 0) {
-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
-            cell.textLabel.text = LocalizedString(@"model_label");
-            CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
-            CGFloat labelW = 100.0;
-            self.modelField.frame = CGRectMake(labelW, 8, cellW - labelW - 20, 28);
-            self.modelField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-            [cell.contentView addSubview:self.modelField];
-        } else {
-            if (self.isFetchingModels) {
-                cell.textLabel.text = LocalizedString(@"fetching_models");
-                cell.textLabel.textColor = [UIColor grayColor];
-                UIActivityIndicatorView *spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
-                [spin startAnimating];
-                cell.accessoryView = spin;
-            } else {
-                cell.textLabel.text = LocalizedString(@"fetch_models_btn");
-                cell.textLabel.textColor = openAIGreen;
-            }
-        }
-    } else if (indexPath.section == 3) {
-        // Dinamik Model Ek Özellikleri & Araçlar (Reasoning Slider / Apple Toggle Switchler)
+        // SECTION 1: MODEL EK ÖZELLİKLERİ VE ARAÇLAR
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         NSArray *rows = [self capabilityRowTypesForCurrentModel];
         NSString *rowType = (indexPath.row < rows.count) ? rows[indexPath.row] : @"";
@@ -851,108 +421,156 @@
             self.codeInterpreterSwitch.on = [OpenAIClient sharedClient].enableCodeInterpreter;
             cell.accessoryView = self.codeInterpreterSwitch;
         }
-    } else if (indexPath.section == 4) {
+    } else if (indexPath.section == 2) {
+        // SECTION 2: ÖZEL SİSTEM TALİMATLARI VE BELLEK
+        // Kullanıcı isteği: "solda siyah başlık sağda yazı ... devam şeklinde her yerden tiklenebilir halde yapacağız"
         NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
         if (indexPath.row < (NSInteger)list.count) {
-            NSMutableDictionary *item = list[indexPath.row];
+            NSDictionary *item = list[indexPath.row];
             BOOL isEnabled = [item[@"enabled"] boolValue];
 
-            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-            cell.textLabel.text = item[@"content"] ?: @"";
-            cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
-            cell.textLabel.numberOfLines = 0; // Bütün metni tam gösterir, kesilmez
-            cell.textLabel.lineBreakMode = NSLineBreakByWordWrapping;
-            cell.textLabel.textColor = [UIColor blackColor];
-            cell.detailTextLabel.text = nil;
+            NSString *title = item[@"title"] ?: @"";
+            NSString *content = item[@"content"] ?: @"";
 
-            // Apple standart Checkmark / Tik işareti
+            if (title.length == 0) {
+                NSArray *lines = [content componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+                NSString *firstLine = lines.firstObject ?: @"";
+                title = (firstLine.length > 20) ? [firstLine substringToIndex:20] : (firstLine.length > 0 ? firstLine : @"Talimat");
+            }
+
+            // Tek satırda özetleme ("... devam şeklinde")
+            NSString *cleanContent = [content stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+
+            cell.textLabel.text = title;
+            cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
+            cell.textLabel.textColor = [UIColor blackColor];
+            cell.textLabel.numberOfLines = 1;
+
+            cell.detailTextLabel.text = cleanContent;
+            cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
+            cell.detailTextLabel.textColor = [UIColor grayColor];
+            cell.detailTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+
+            // Her yerden tiklenebilir (Apple checkmark)
             cell.accessoryType = isEnabled ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+
+            // Satırın en sağına detay/düzenleme sayfasına geçiş için Disclosure Button (i simgesi)
+            UIButton *infoButton = [UIButton buttonWithType:UIButtonTypeDetailDisclosure];
+            infoButton.tag = 1000 + indexPath.row;
+            [infoButton addTarget:self action:@selector(instructionInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+            cell.accessoryView = infoButton;
         } else {
             // "+ Yeni Talimat Ekle" satırı
-            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
             cell.textLabel.text = LocalizedString(@"add_prompt_button");
             cell.textLabel.textColor = openAIGreen;
             cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:15.0];
             cell.textLabel.numberOfLines = 1;
             cell.detailTextLabel.text = nil;
-            cell.accessoryType = UITableViewCellAccessoryNone;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.accessoryView = nil;
         }
-    } else if (indexPath.section == 5) {
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        cell.textLabel.text = LocalizedString(@"apikey_label");
-        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
-        CGFloat labelW = 115.0;
-        self.apiKeyField.frame = CGRectMake(labelW, 8, cellW - labelW - 20, 28);
-        self.apiKeyField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-        [cell.contentView addSubview:self.apiKeyField];
-    } else if (indexPath.section == 6) {
-        // İLERİ SEVİYE AYARLAR (Ayrı alt sayfaya giden Apple Navigation Row)
-        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    } else if (indexPath.section == 3) {
+        // SECTION 3: HESAP VE GİRİŞ AYARLARI (Sağa giden Apple Navigation Row)
+        cell.textLabel.text = LocalizedString(@"account_login_menu_row");
+        cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:16.0];
+        if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
+            NSString *email = [OpenAIClient sharedClient].userEmail;
+            cell.detailTextLabel.text = (email && email.length > 0) ? email : LocalizedString(@"siwc_connected");
+            cell.detailTextLabel.textColor = openAIGreen;
+        } else if ([OpenAIClient sharedClient].apiKey.length > 0) {
+            cell.detailTextLabel.text = @"API Key";
+            cell.detailTextLabel.textColor = openAIGreen;
+        } else {
+            cell.detailTextLabel.text = nil;
+        }
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    } else if (indexPath.section == 4) {
+        // SECTION 4: İLERİ SEVİYE MALİYET VE HAFIZA AYARLARI (Sağa giden Apple Navigation Row)
         cell.textLabel.text = LocalizedString(@"adv_menu_row");
         cell.textLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:16.0];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    } else {
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        if (indexPath.row == 0) {
-            cell.textLabel.text = LocalizedString(@"host_id_label");
-            cell.detailTextLabel.text = [OpenAIClient sharedClient].hostId;
-            cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:11.0];
-        } else {
-            cell.textLabel.text = LocalizedString(@"version_label");
-            cell.detailTextLabel.text = @"v1.7.1 (Pure iOS 8 UI)";
-        }
+    } else if (indexPath.section == 5) {
+        // SECTION 5: DİL SEÇENEĞİ
+        cell.textLabel.text = LocalizedString(@"language_label");
+        cell.detailTextLabel.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
+        cell.detailTextLabel.textColor = openAIGreen;
+        cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
 
     return cell;
+}
+
+- (void)instructionInfoButtonTapped:(UIButton *)sender {
+    NSInteger index = sender.tag - 1000;
+    [self openInstructionDetailAtIndex:index];
+}
+
+- (void)openInstructionDetailAtIndex:(NSInteger)index {
+    NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
+    SystemPromptDetailViewController *detailVC = [[SystemPromptDetailViewController alloc] init];
+    detailVC.delegate = self;
+
+    if (index >= 0 && index < (NSInteger)list.count) {
+        NSDictionary *item = list[index];
+        detailVC.promptIndex = index;
+        detailVC.promptId = item[@"id"];
+        detailVC.initialTitle = item[@"title"];
+        detailVC.initialContent = item[@"content"];
+        detailVC.isEnabled = [item[@"enabled"] boolValue];
+    } else {
+        detailVC.promptIndex = -1;
+        detailVC.initialTitle = @"";
+        detailVC.initialContent = @"";
+        detailVC.isEnabled = YES;
+    }
+
+    [self.navigationController pushViewController:detailVC animated:YES];
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
     if (indexPath.section == 0) {
-        [self.languagePickerField becomeFirstResponder];
-    } else if (indexPath.section == 1) {
-        if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
-            if (indexPath.row == 2) {
-                [self manageUsageAction];
-            } else if (indexPath.row == 3) {
-                [self disconnectAccountAction];
-            }
-        } else {
-            if (indexPath.row == 0) {
-                [self signInWithChatGPTAction];
-            } else if (indexPath.row == 1) {
-                [self pasteManualCallbackAction];
-            }
-        }
-    } else if (indexPath.section == 2 && indexPath.row == 1) {
-        if (!self.isFetchingModels) {
-            [self refreshModelsAction];
-        }
-    } else if (indexPath.section == 4) {
+        // Model Seçim sayfasına geçiş
+        ModelSelectionViewController *modelVC = [[ModelSelectionViewController alloc] init];
+        modelVC.delegate = self;
+        [self.navigationController pushViewController:modelVC animated:YES];
+    } else if (indexPath.section == 2) {
         NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
         if (indexPath.row < (NSInteger)list.count) {
-            // Yazının neresine tıklanırsa tıklansın tik durumunu değiştir
+            // Kullanıcı isteği: Satırın neresine tıklanırsa tıklansın tikle / tiki kaldır
             NSMutableDictionary *item = list[indexPath.row];
             BOOL current = [item[@"enabled"] boolValue];
             item[@"enabled"] = @(!current);
             [[OpenAIClient sharedClient] saveSystemPromptsList:list];
             [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+            if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+                [self.delegate settingsDidUpdate];
+            }
         } else {
-            // Yeni Talimat Ekle
-            [self addNewPromptAction];
+            // "+ Yeni Talimat Ekle" satırına tıklandığında sağa giden yeni talimat sayfasına git
+            [self openInstructionDetailAtIndex:-1];
         }
-    } else if (indexPath.section == 6) {
-        // İleri Seviye Ayarlar alt sayfasına Apple Push animasyonu ile geçiş yap
+    } else if (indexPath.section == 3) {
+        // Hesap ve Giriş Ayarları sayfasına geçiş
+        AccountLoginViewController *accVC = [[AccountLoginViewController alloc] init];
+        accVC.delegate = self;
+        [self.navigationController pushViewController:accVC animated:YES];
+    } else if (indexPath.section == 4) {
+        // İleri Seviye Ayarlar sayfasına geçiş
         AdvancedSettingsViewController *advVC = [[AdvancedSettingsViewController alloc] init];
         [self.navigationController pushViewController:advVC animated:YES];
+    } else if (indexPath.section == 5) {
+        // Dil seçimi picker'ını aç
+        [self.languagePickerField becomeFirstResponder];
     }
 }
 
-#pragma mark - Table View Editing (Swipe to Delete / Edit)
+#pragma mark - Table View Swipe to Delete
 
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 4) {
+    if (indexPath.section == 2) {
         NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
         return (indexPath.row < count);
     }
@@ -960,21 +578,24 @@
 }
 
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 4 && editingStyle == UITableViewCellEditingStyleDelete) {
+    if (indexPath.section == 2 && editingStyle == UITableViewCellEditingStyleDelete) {
         NSMutableArray *list = [OpenAIClient sharedClient].systemPromptsList;
         if (indexPath.row < (NSInteger)list.count) {
             [list removeObjectAtIndex:indexPath.row];
             [[OpenAIClient sharedClient] saveSystemPromptsList:list];
             [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+            if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+                [self.delegate settingsDidUpdate];
+            }
         }
     }
 }
 
 - (NSArray<UITableViewRowAction *> *)tableView:(UITableView *)tableView editActionsForRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 4) {
+    if (indexPath.section == 2) {
         NSInteger count = [OpenAIClient sharedClient].systemPromptsList.count;
         if (indexPath.row < count) {
-            // 1. Silme Aksiyonu (Türkçe/İngilizce "Sil" / "Delete")
+            // Kullanıcı isteği: "düzenle yazısı kaldırılcak ve sağ tarafta sadece kırmızı sil olucak"
             UITableViewRowAction *deleteAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDestructive
                                                                                     title:LocalizedString(@"delete_button")
                                                                                   handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
@@ -983,25 +604,15 @@
                     [list removeObjectAtIndex:ip.row];
                     [[OpenAIClient sharedClient] saveSystemPromptsList:list];
                     [tableView deleteRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
+                    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+                        [self.delegate settingsDidUpdate];
+                    }
                 }
             }];
-
-            // 2. Düzenle Aksiyonu (Mavi Apple Stili)
-            UITableViewRowAction *editAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleNormal
-                                                                                  title:LocalizedString(@"edit_prompt_title")
-                                                                                handler:^(UITableViewRowAction *action, NSIndexPath *ip) {
-                [self editPromptAtIndex:ip.row];
-            }];
-            editAction.backgroundColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.8 alpha:1.0];
-
-            return @[deleteAction, editAction];
+            return @[deleteAction];
         }
     }
     return nil;
-}
-
-- (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 @end
