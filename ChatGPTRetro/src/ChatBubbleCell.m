@@ -4,7 +4,8 @@ static const CGFloat kHorizontalMargin = 12.0;
 static const CGFloat kVerticalMargin = 4.0;
 static const CGFloat kInnerHorizontalPad = 14.0;
 static const CGFloat kInnerVerticalPad = 10.0;
-static const CGFloat kCornerRadius = 14.0;
+static const CGFloat kCornerRadius = 18.0;
+static const CGFloat kMaxBubbleWidthRatio = 0.92; // Geniş ve ekranı dolduran modern iMessage balonu
 
 @implementation ChatBubbleCell
 
@@ -20,7 +21,6 @@ static const CGFloat kCornerRadius = 14.0;
         _bubbleBackgroundView.layer.masksToBounds = YES;
         [self.contentView addSubview:_bubbleBackgroundView];
 
-        // UITextView for selectable, copyable text with rich Markdown formatting
         _messageTextView = [[UITextView alloc] initWithFrame:CGRectZero];
         _messageTextView.editable = NO;
         _messageTextView.selectable = YES;
@@ -34,7 +34,133 @@ static const CGFloat kCornerRadius = 14.0;
     return self;
 }
 
-#pragma mark - Markdown Parser
+#pragma mark - Markdown & GFM Table Parser
+
++ (BOOL)isTableSeparatorRow:(NSString *)trimmed {
+    if (![trimmed containsString:@"-"]) return NO;
+    NSString *cleaned = [trimmed stringByReplacingOccurrencesOfString:@"|" withString:@""];
+    cleaned = [cleaned stringByReplacingOccurrencesOfString:@":" withString:@""];
+    cleaned = [cleaned stringByReplacingOccurrencesOfString:@"-" withString:@""];
+    cleaned = [cleaned stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    return (cleaned.length == 0);
+}
+
++ (NSArray *)splitTableRow:(NSString *)row {
+    NSString *trimmed = [row stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if ([trimmed hasPrefix:@"|"]) trimmed = [trimmed substringFromIndex:1];
+    if ([trimmed hasSuffix:@"|"]) trimmed = [trimmed substringToIndex:trimmed.length - 1];
+
+    NSArray *rawParts = [trimmed componentsSeparatedByString:@"|"];
+    NSMutableArray *cleaned = [NSMutableArray array];
+    for (NSString *p in rawParts) {
+        [cleaned addObject:[p stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
+    }
+    return cleaned;
+}
+
++ (NSAttributedString *)formatTableRows:(NSArray *)tableRows isUser:(BOOL)isUser {
+    if (tableRows.count == 0) return [[NSAttributedString alloc] initWithString:@""];
+
+    UIFont *headerFont = [UIFont fontWithName:@"HelveticaNeue-Bold" size:14.5];
+    UIFont *cellFont = [UIFont fontWithName:@"HelveticaNeue" size:14.0];
+    UIColor *textColor = isUser ? [UIColor whiteColor] : [UIColor colorWithRed:0.12 green:0.12 blue:0.13 alpha:1.0];
+    UIColor *boxColor = isUser ? [UIColor colorWithWhite:1.0 alpha:0.45] : [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:0.65];
+
+    // Sütun sayısını ve genişliklerini hesapla
+    NSInteger maxCols = 0;
+    NSMutableArray *parsedRows = [NSMutableArray array];
+    for (NSString *rowStr in tableRows) {
+        NSArray *cells = [self splitTableRow:rowStr];
+        if (cells.count > maxCols) maxCols = cells.count;
+        [parsedRows addObject:cells];
+    }
+
+    if (maxCols == 0) return [[NSAttributedString alloc] initWithString:@""];
+
+    NSMutableArray *colWidths = [NSMutableArray array];
+    for (NSInteger c = 0; c < maxCols; c++) {
+        NSInteger maxLen = 4; // minimum sütun genişliği
+        for (NSArray *row in parsedRows) {
+            if (c < row.count) {
+                NSString *val = row[c];
+                if (val.length > maxLen) maxLen = val.length;
+            }
+        }
+        if (maxLen > 24) maxLen = 24; // çok uzun metinlerin tabloyu taşırmaması için sınır
+        [colWidths addObject:@(maxLen)];
+    }
+
+    NSMutableAttributedString *tableAttr = [[NSMutableAttributedString alloc] init];
+    NSMutableParagraphStyle *tablePara = [[NSMutableParagraphStyle alloc] init];
+    tablePara.lineSpacing = 2.0;
+
+    // Üst Çizgi: ┌────────┬────────┐
+    NSMutableString *topBorder = [NSMutableString stringWithString:@"┌"];
+    for (NSInteger c = 0; c < maxCols; c++) {
+        NSInteger w = [colWidths[c] integerValue];
+        for (NSInteger k = 0; k < w + 2; k++) [topBorder appendString:@"─"];
+        [topBorder appendString:(c == maxCols - 1) ? @"┐\n" : @"┬"];
+    }
+    [tableAttr appendAttributedString:[[NSAttributedString alloc] initWithString:topBorder attributes:@{
+        NSFontAttributeName: [UIFont fontWithName:@"Courier" size:12.5] ?: [UIFont systemFontOfSize:12.5],
+        NSForegroundColorAttributeName: boxColor,
+        NSParagraphStyleAttributeName: tablePara
+    }]];
+
+    for (NSInteger r = 0; r < parsedRows.count; r++) {
+        NSArray *row = parsedRows[r];
+        BOOL isHeader = (r == 0);
+
+        NSMutableString *rowText = [NSMutableString stringWithString:@"│"];
+        for (NSInteger c = 0; c < maxCols; c++) {
+            NSString *cellVal = (c < row.count) ? row[c] : @"";
+            NSInteger w = [colWidths[c] integerValue];
+            if (cellVal.length > w) {
+                cellVal = [[cellVal substringToIndex:w - 1] stringByAppendingString:@"…"];
+            }
+            NSInteger pad = w - cellVal.length;
+            [rowText appendFormat:@" %@%*s │", cellVal, (int)pad, ""];
+        }
+        [rowText appendString:@"\n"];
+
+        NSDictionary *rowAttrs = @{
+            NSFontAttributeName: isHeader ? headerFont : cellFont,
+            NSForegroundColorAttributeName: textColor,
+            NSParagraphStyleAttributeName: tablePara
+        };
+        [tableAttr appendAttributedString:[[NSAttributedString alloc] initWithString:rowText attributes:rowAttrs]];
+
+        // Başlık altı ayracı: ├────────┼────────┤
+        if (isHeader) {
+            NSMutableString *midBorder = [NSMutableString stringWithString:@"├"];
+            for (NSInteger c = 0; c < maxCols; c++) {
+                NSInteger w = [colWidths[c] integerValue];
+                for (NSInteger k = 0; k < w + 2; k++) [midBorder appendString:@"─"];
+                [midBorder appendString:(c == maxCols - 1) ? @"┤\n" : @"┼"];
+            }
+            [tableAttr appendAttributedString:[[NSAttributedString alloc] initWithString:midBorder attributes:@{
+                NSFontAttributeName: [UIFont fontWithName:@"Courier" size:12.5] ?: [UIFont systemFontOfSize:12.5],
+                NSForegroundColorAttributeName: boxColor,
+                NSParagraphStyleAttributeName: tablePara
+            }]];
+        }
+    }
+
+    // Alt Çizgi: └────────┴────────┘
+    NSMutableString *botBorder = [NSMutableString stringWithString:@"└"];
+    for (NSInteger c = 0; c < maxCols; c++) {
+        NSInteger w = [colWidths[c] integerValue];
+        for (NSInteger k = 0; k < w + 2; k++) [botBorder appendString:@"─"];
+        [botBorder appendString:(c == maxCols - 1) ? @"┘\n" : @"┴"];
+    }
+    [tableAttr appendAttributedString:[[NSAttributedString alloc] initWithString:botBorder attributes:@{
+        NSFontAttributeName: [UIFont fontWithName:@"Courier" size:12.5] ?: [UIFont systemFontOfSize:12.5],
+        NSForegroundColorAttributeName: boxColor,
+        NSParagraphStyleAttributeName: tablePara
+    }]];
+
+    return tableAttr;
+}
 
 + (NSAttributedString *)parseMarkdown:(NSString *)rawText isUser:(BOOL)isUser {
     if (!rawText || rawText.length == 0) {
@@ -43,14 +169,14 @@ static const CGFloat kCornerRadius = 14.0;
 
     UIColor *baseTextColor = isUser ? [UIColor whiteColor] : [UIColor colorWithRed:0.13 green:0.13 blue:0.14 alpha:1.0];
     UIColor *h1Color = isUser ? [UIColor whiteColor] : [UIColor colorWithRed:0.08 green:0.08 blue:0.09 alpha:1.0];
-    UIColor *h2Color = isUser ? [UIColor whiteColor] : [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0]; // OpenAI Green
+    UIColor *h2Color = isUser ? [UIColor whiteColor] : [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0]; // OpenAI Teal
     UIColor *h3Color = isUser ? [UIColor whiteColor] : [UIColor colorWithRed:0.25 green:0.25 blue:0.26 alpha:1.0];
 
     UIFont *bodyFont = [UIFont fontWithName:@"HelveticaNeue" size:16.0];
     UIFont *boldBodyFont = [UIFont fontWithName:@"HelveticaNeue-Bold" size:16.0];
-    UIFont *h1Font = [UIFont fontWithName:@"HelveticaNeue-Bold" size:22.0];
-    UIFont *h2Font = [UIFont fontWithName:@"HelveticaNeue-Bold" size:19.0];
-    UIFont *h3Font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:17.0];
+    UIFont *h1Font = [UIFont fontWithName:@"HelveticaNeue-Bold" size:21.0];
+    UIFont *h2Font = [UIFont fontWithName:@"HelveticaNeue-Bold" size:18.5];
+    UIFont *h3Font = [UIFont fontWithName:@"HelveticaNeue-Medium" size:16.5];
 
     NSMutableAttributedString *finalAttrString = [[NSMutableAttributedString alloc] init];
     NSArray *lines = [rawText componentsSeparatedByString:@"\n"];
@@ -58,6 +184,32 @@ static const CGFloat kCornerRadius = 14.0;
     for (NSInteger i = 0; i < lines.count; i++) {
         NSString *line = lines[i];
         NSString *trimmed = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+
+        // GFM Tablo Algılama: Satırda | varsa ve sonraki satır |---| içeriyorsa
+        if ([trimmed containsString:@"|"]) {
+            // Sonraki satır tablo ayıracı mı? (Header ayracı)
+            if (i + 1 < lines.count && [self isTableSeparatorRow:lines[i + 1]]) {
+                NSMutableArray *tableRows = [NSMutableArray array];
+                [tableRows addObject:line]; // Header
+                i++; // separator satırını atla
+
+                // Kalan tablo satırlarını topla
+                while (i + 1 < lines.count) {
+                    NSString *nextRow = lines[i + 1];
+                    NSString *nextTrimmed = [nextRow stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+                    if ([nextTrimmed containsString:@"|"] && ![self isTableSeparatorRow:nextTrimmed]) {
+                        [tableRows addObject:nextRow];
+                        i++;
+                    } else {
+                        break;
+                    }
+                }
+
+                NSAttributedString *renderedTable = [self formatTableRows:tableRows isUser:isUser];
+                [finalAttrString appendAttributedString:renderedTable];
+                continue;
+            }
+        }
 
         UIFont *lineBaseFont = bodyFont;
         UIFont *lineBoldFont = boldBodyFont;
@@ -88,10 +240,10 @@ static const CGFloat kCornerRadius = 14.0;
         }
 
         NSMutableParagraphStyle *paraStyle = [[NSMutableParagraphStyle alloc] init];
-        paraStyle.lineSpacing = 3.0;
+        paraStyle.lineSpacing = 2.5;
         if (lineBaseFont == h1Font || lineBaseFont == h2Font) {
-            paraStyle.paragraphSpacing = 6.0;
-            paraStyle.paragraphSpacingBefore = 4.0;
+            paraStyle.paragraphSpacing = 5.0;
+            paraStyle.paragraphSpacingBefore = 3.0;
         } else {
             paraStyle.paragraphSpacing = 2.0;
         }
@@ -154,46 +306,48 @@ static const CGFloat kCornerRadius = 14.0;
     }
 
     NSAttributedString *attr = [self attributedTextForMessage:message];
-    CGFloat bubbleWidth = width - (kHorizontalMargin * 2);
-    CGFloat textWidth = bubbleWidth - (kInnerHorizontalPad * 2);
+    CGFloat maxBubbleW = width * kMaxBubbleWidthRatio;
+    CGFloat maxTextW = maxBubbleW - (kInnerHorizontalPad * 2);
 
-    CGSize textSize = [self sizeForAttributedText:attr maxWidth:textWidth];
+    CGSize textSize = [self sizeForAttributedText:attr maxWidth:maxTextW];
     CGFloat totalH = textSize.height + (kInnerVerticalPad * 2) + (kVerticalMargin * 2) + 2.0;
 
-    if (totalH < 48.0) totalH = 48.0;
+    if (totalH < 44.0) totalH = 44.0;
     message.cachedHeight = totalH;
     return totalH;
 }
 
-#pragma mark - Configure Cell
+#pragma mark - Configure Cell (Classic iMessage Bubble Alignment with Expanded Width)
 
 - (void)configureWithMessage:(ChatMessage *)message containerWidth:(CGFloat)width {
     _message = message;
     NSAttributedString *attr = [[self class] attributedTextForMessage:message];
     _messageTextView.attributedText = attr;
 
-    // Full screen width from left margin to right margin
-    CGFloat bubbleX = kHorizontalMargin;
-    CGFloat bubbleWidth = width - (kHorizontalMargin * 2);
-    CGFloat textWidth = bubbleWidth - (kInnerHorizontalPad * 2);
+    CGFloat maxBubbleW = width * kMaxBubbleWidthRatio;
+    CGFloat maxTextW = maxBubbleW - (kInnerHorizontalPad * 2);
 
-    CGSize textSize = [[self class] sizeForAttributedText:attr maxWidth:textWidth];
+    CGSize textSize = [[self class] sizeForAttributedText:attr maxWidth:maxTextW];
+    CGFloat bubbleWidth = textSize.width + (kInnerHorizontalPad * 2);
+    if (bubbleWidth > maxBubbleW) bubbleWidth = maxBubbleW;
     CGFloat bubbleHeight = textSize.height + (kInnerVerticalPad * 2);
 
-    _bubbleBackgroundView.frame = CGRectMake(bubbleX, kVerticalMargin, bubbleWidth, bubbleHeight);
-    _messageTextView.frame = CGRectMake(kInnerHorizontalPad, kInnerVerticalPad, textWidth, textSize.height);
-
     if (message.sender == ChatMessageSenderUser) {
-        // User: OpenAI Deep Green Accent
-        _bubbleBackgroundView.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:0.96];
-        _bubbleBackgroundView.layer.borderColor = [UIColor colorWithRed:14.0/255.0 green:140.0/255.0 blue:110.0/255.0 alpha:1.0].CGColor;
-        _bubbleBackgroundView.layer.borderWidth = 0.5;
+        // Kullanıcı: Sağ tarafa yaslı iMessage balonu (OpenAI Yeşili)
+        _bubbleBackgroundView.backgroundColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
+        _bubbleBackgroundView.layer.borderWidth = 0.0;
+        CGFloat x = width - bubbleWidth - kHorizontalMargin;
+        _bubbleBackgroundView.frame = CGRectMake(x, kVerticalMargin, bubbleWidth, bubbleHeight);
     } else {
-        // Assistant: Clean Modern Neutral Off-White Card
-        _bubbleBackgroundView.backgroundColor = [UIColor whiteColor];
-        _bubbleBackgroundView.layer.borderColor = [UIColor colorWithWhite:0.86 alpha:1.0].CGColor;
-        _bubbleBackgroundView.layer.borderWidth = 0.8;
+        // Asistan: Sol tarafa yaslı iMessage balonu (Şık Açık Gri Balon)
+        _bubbleBackgroundView.backgroundColor = [UIColor colorWithRed:0.91 green:0.91 blue:0.93 alpha:1.0];
+        _bubbleBackgroundView.layer.borderColor = [UIColor colorWithWhite:0.84 alpha:1.0].CGColor;
+        _bubbleBackgroundView.layer.borderWidth = 0.5;
+        CGFloat x = kHorizontalMargin;
+        _bubbleBackgroundView.frame = CGRectMake(x, kVerticalMargin, bubbleWidth, bubbleHeight);
     }
+
+    _messageTextView.frame = CGRectMake(kInnerHorizontalPad, kInnerVerticalPad, textSize.width, textSize.height);
 }
 
 @end
