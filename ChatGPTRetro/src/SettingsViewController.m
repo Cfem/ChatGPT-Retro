@@ -56,6 +56,14 @@
         self.navigationItem.rightBarButtonItem.title = LocalizedString(@"save_button");
         [self updateLanguageFieldText];
         [self.languagePicker reloadAllComponents];
+
+        // Toolbar üzerindeki Tamam butonunu da güncelle
+        UIToolbar *tb = (UIToolbar *)self.languagePickerField.inputAccessoryView;
+        if ([tb isKindOfClass:[UIToolbar class]] && tb.items.count > 1) {
+            tb.items.lastObject.title = LocalizedString(@"ok_button");
+        }
+
+        // languagePickerField self.view üzerinde olduğu için tableView reloadData çarkı kapatmaz!
         [self.tableView reloadData];
     });
 }
@@ -71,17 +79,14 @@
 }
 
 - (void)setupFields {
-    // 1. Language Picker Field & Accessory Toolbar (iOS classic bottom wheel)
+    // 1. Language Picker Field & Accessory Toolbar (iOS classic bottom wheel, hidden trigger)
     _languagePicker = [[UIPickerView alloc] init];
     _languagePicker.dataSource = self;
     _languagePicker.delegate = self;
 
     _languagePickerField = [[UITextField alloc] initWithFrame:CGRectZero];
-    _languagePickerField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    _languagePickerField.hidden = YES;
     _languagePickerField.inputView = _languagePicker;
-    _languagePickerField.textAlignment = NSTextAlignmentRight;
-    _languagePickerField.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
-    _languagePickerField.textColor = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
 
     UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
     pickerToolbar.barStyle = UIBarStyleDefault;
@@ -92,6 +97,7 @@
                                                                action:@selector(languagePickerDone)];
     pickerToolbar.items = @[flex, doneBtn];
     _languagePickerField.inputAccessoryView = pickerToolbar;
+    [self.view addSubview:_languagePickerField];
 
     [self selectCurrentLanguageInPickerAnimated:NO];
     [self updateLanguageFieldText];
@@ -399,16 +405,13 @@
     UIColor *openAIGreen = [UIColor colorWithRed:16.0/255.0 green:163.0/255.0 blue:127.0/255.0 alpha:1.0];
 
     if (indexPath.section == 0) {
-        // iOS Klasik Alttan Çarklı Dil Seçici Hücresi
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        // iOS Klasik Alttan Çarklı Dil Seçici Hücresi (Salt okunur etiket, seçilip silinemez)
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         cell.textLabel.text = LocalizedString(@"language_label");
+        cell.detailTextLabel.text = [[LocalizationManager sharedManager] displayNameForLanguage:[LocalizationManager sharedManager].selectedLanguage];
+        cell.detailTextLabel.textColor = openAIGreen;
+        cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:15.0];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-
-        CGFloat cellW = cell.contentView.bounds.size.width > 0 ? cell.contentView.bounds.size.width : w;
-        CGFloat labelWidth = 135.0;
-        self.languagePickerField.frame = CGRectMake(labelWidth, 8, cellW - labelWidth - 36, 28);
-        self.languagePickerField.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-        [cell.contentView addSubview:self.languagePickerField];
     } else if (indexPath.section == 1) {
         if ([[OpenAIClient sharedClient] isChatGPTAccountLinked]) {
             if (indexPath.row == 0) {
@@ -489,7 +492,7 @@
             cell.detailTextLabel.font = [UIFont fontWithName:@"HelveticaNeue" size:11.0];
         } else {
             cell.textLabel.text = LocalizedString(@"version_label");
-            cell.detailTextLabel.text = @"v1.6 (Pure iOS 8 UI)";
+            cell.detailTextLabel.text = @"v1.6.1 (Pure iOS 8 UI)";
         }
     }
 

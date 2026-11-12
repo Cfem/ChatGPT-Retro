@@ -110,7 +110,7 @@
     } else if ([OpenAIClient sharedClient].apiKey.length > 10) {
         authStatus = LocalizedString(@"auth_status_ready");
     }
-    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.5)", model ?: @"gpt-4o-mini", authStatus];
+    self.navigationItem.prompt = [NSString stringWithFormat:@"Model: %@%@ (v1.6.1)", model ?: @"gpt-4o-mini", authStatus];
 }
 
 - (void)setupNavigationItems {
@@ -383,6 +383,11 @@
 - (void)sidebarDidSelectSession:(ChatSession *)session {
     [self loadSession:session];
     [self closeSidebar];
+}
+
+- (void)sidebarDidDeleteSession:(ChatSession *)newActiveSession {
+    // Sohbet silindiğinde arka plandaki konuşmayı güncelle ama sidebar'ı açık tut
+    [self loadSession:newActiveSession];
 }
 
 - (void)sidebarDidRequestNewChat {
