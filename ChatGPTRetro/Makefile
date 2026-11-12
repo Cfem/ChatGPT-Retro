@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 APPLICATION_NAME = ChatGPTRetro
 
 ChatGPTRetro_FILES = $(wildcard src/*.m)
-ChatGPTRetro_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore Security
+ChatGPTRetro_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore Security CoreImage
 ChatGPTRetro_CFLAGS = -fobjc-arc -O2 -Wall -Wno-deprecated-declarations -Wno-deprecated-module-dot-map -I$(CURDIR)/include
 ChatGPTRetro_LDFLAGS = -L$(CURDIR)/lib -lcurl -lssl -lcrypto -lz -Wl,-dead_strip -Wl,-undefined,dynamic_lookup
 ChatGPTRetro_CODESIGN_FLAGS = -S$(CURDIR)/Resources/entitlements.plist

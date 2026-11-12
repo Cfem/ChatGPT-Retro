@@ -3,8 +3,9 @@
 #import "ChatMessage.h"
 #import "OpenAIClient.h"
 #import "SettingsViewController.h"
+#import "ChatGPTLoginModalViewController.h"
 
-@interface ChatViewController () <SettingsViewControllerDelegate>
+@interface ChatViewController () <SettingsViewControllerDelegate, ChatGPTLoginModalDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSMutableArray *messages;
@@ -347,25 +348,24 @@
 
 - (void)showAuthPrompt {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ChatGPT Girişi Gerekli"
-                                                                   message:@"ChatGPT ile konuşabilmek için ChatGPT Plus/Pro hesabınızla Safari üzerinden giriş yapabilir veya Ayarlar'dan OpenAI API Anahtarı girebilirsiniz."
+                                                                   message:@"ChatGPT ile konuşabilmek için ChatGPT Plus/Pro hesabınızla QR / Telefon üzerinden giriş yapabilir veya Ayarlar'dan OpenAI API Anahtarı girebilirsiniz."
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Continue with ChatGPT (Safari)" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-        [[OpenAIClient sharedClient] startSignInWithChatGPTInSafariWithCompletion:^(BOOL success, NSError *error) {
-            [self updateTitleWithModel];
-            if (!success && error) {
-                UIAlertController *errAlert = [UIAlertController alertControllerWithTitle:@"Giriş Hatası"
-                                                                                  message:error.localizedDescription
-                                                                           preferredStyle:UIAlertControllerStyleAlert];
-                [errAlert addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
-                [self presentViewController:errAlert animated:YES completion:nil];
-            }
-        }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"ChatGPT ile Giriş Yap (QR / Telefon)" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        ChatGPTLoginModalViewController *modal = [[ChatGPTLoginModalViewController alloc] init];
+        modal.delegate = self;
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:modal];
+        nav.modalPresentationStyle = UIModalPresentationFormSheet;
+        [self presentViewController:nav animated:YES completion:nil];
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Ayarlar'ı Aç" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         [self openSettingsTapped];
     }]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)chatGPTLoginDidComplete {
+    [self updateTitleWithModel];
 }
 
 #pragma mark - Table View Data Source & Delegate

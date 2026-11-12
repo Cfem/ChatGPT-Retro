@@ -1,7 +1,8 @@
 #import "SettingsViewController.h"
 #import "OpenAIClient.h"
+#import "ChatGPTLoginModalViewController.h"
 
-@interface SettingsViewController ()
+@interface SettingsViewController () <ChatGPTLoginModalDelegate>
 
 @property (nonatomic, strong) UITextField *apiKeyField;
 @property (nonatomic, strong) UITextField *modelField;
@@ -106,23 +107,21 @@
 
 - (void)signInWithChatGPTAction {
     [self.view endEditing:YES];
-    self.isSigningIn = YES;
-    [self.tableView reloadData];
+    ChatGPTLoginModalViewController *modal = [[ChatGPTLoginModalViewController alloc] init];
+    modal.delegate = self;
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:modal];
+    nav.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:nav animated:YES completion:nil];
+}
 
-    [[OpenAIClient sharedClient] startSignInWithChatGPTInSafariWithCompletion:^(BOOL success, NSError *error) {
-        self.isSigningIn = NO;
-        [self.tableView reloadData];
-        if (success) {
-            if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
-                [self.delegate settingsDidUpdate];
-            }
-            NSString *email = [OpenAIClient sharedClient].userEmail ?: @"ChatGPT Hesabı";
-            [self showAlertWithTitle:@"Bağlantı Başarılı!"
-                             message:[NSString stringWithFormat:@"%@ hesabınızla giriş yapıldı. ChatGPT Plus/Pro plan kullanımınız aktif!", email]];
-        } else if (error) {
-            [self showAlertWithTitle:@"Giriş Hatası" message:error.localizedDescription];
-        }
-    }];
+- (void)chatGPTLoginDidComplete {
+    [self.tableView reloadData];
+    if ([self.delegate respondsToSelector:@selector(settingsDidUpdate)]) {
+        [self.delegate settingsDidUpdate];
+    }
+    NSString *email = [OpenAIClient sharedClient].userEmail ?: @"ChatGPT Hesabı";
+    [self showAlertWithTitle:@"Bağlantı Başarılı!"
+                     message:[NSString stringWithFormat:@"%@ hesabınızla giriş yapıldı. ChatGPT Plus/Pro plan kullanımınız aktif!", email]];
 }
 
 - (void)pasteManualCallbackAction {
